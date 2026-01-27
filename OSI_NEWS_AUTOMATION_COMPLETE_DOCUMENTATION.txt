@@ -1,0 +1,1296 @@
+================================================================================
+OSI NEWS AUTOMATION SYSTEM - COMPLETE PROJECT DOCUMENTATION
+================================================================================
+Version: 1.0
+Last Updated: January 23, 2026
+Python Version: 3.11.9
+Platform: Windows 10/11
+================================================================================
+
+TABLE OF CONTENTS
+================================================================================
+1. PROJECT OVERVIEW
+2. SYSTEM ARCHITECTURE
+3. TECHNOLOGY STACK
+4. CORE COMPONENTS & MODULES
+5. LIBRARIES & DEPENDENCIES
+6. DATABASE SCHEMA
+7. API INTEGRATIONS
+8. WORKFLOW & PIPELINE
+9. CONFIGURATION
+10. DEPLOYMENT
+11. MONITORING & LOGGING
+12. FILE STRUCTURE
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+PROJECT NAME: OSI News Automation System
+
+PURPOSE:
+An intelligent, automated news generation and publishing system that:
+- Scrapes news from 25+ global sources
+- Detects trending topics using AI/ML clustering
+- Generates comprehensive articles using LLM (Groq API)
+- Creates AI-generated images (Stable Diffusion)
+- Translates content to multiple languages
+- Publishes to Hocalwire CMS
+- Generates social media posts for multiple platforms
+
+KEY FEATURES:
+✓ Multi-source news scraping (RSS + Web Scraping)
+✓ AI-powered trend detection and clustering
+✓ Automated article generation with LLM
+✓ Local AI image generation (Stable Diffusion)
+✓ Multi-language translation (5+ languages)
+✓ Automated CMS publishing (Hocalwire)
+✓ Social media post generation
+✓ Scheduled automation (every 3 hours)
+✓ MongoDB database storage
+✓ Web-based frontend dashboard
+✓ Comprehensive logging and monitoring
+
+TARGET USE CASE:
+Automated news aggregation and content creation for news organizations,
+reducing manual effort while maintaining quality and diversity.
+
+================================================================================
+2. SYSTEM ARCHITECTURE
+================================================================================
+
+ARCHITECTURE TYPE: Modular Monolithic Pipeline
+
+DESIGN PATTERN: Pipeline Architecture with Service-Oriented Modules
+
+EXECUTION FLOW:
+┌─────────────────────────────────────────────────────────────────┐
+│                    OSI NEWS AUTOMATION PIPELINE                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ STEP 1: NEWS SCRAPING                                            │
+│ - RSS Feed Parsing (25+ sources)                                │
+│ - Web Scraping (newspaper3k, BeautifulSoup, Playwright)         │
+│ - Article Extraction & Metadata Collection                      │
+│ Output: Raw articles with metadata                              │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ STEP 2: TREND DETECTION                                          │
+│ - Text Embedding (sentence-transformers)                        │
+│ - Semantic Clustering (DBSCAN algorithm)                        │
+│ - Trend Identification & Ranking                                │
+│ Output: Clustered trending topics                               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ STEP 3: ARTICLE GENERATION                                       │
+│ - LLM Processing (Groq API - Llama 3 70B)                       │
+│ - Comprehensive Article Creation (800-1200 words)               │
+│ - Structured Content with Subheadings                           │
+│ Output: Generated articles                                      │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ STEP 4: IMAGE GENERATION (Optional)                              │
+│ - Stable Diffusion Pipeline (Local)                             │
+│ - AI Image Creation from Article Context                        │
+│ - Cloudinary Upload                                             │
+│ Output: Article images with URLs                                │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ STEP 5: TRANSLATION (Optional)                                   │
+│ - Multi-language Translation (deep-translator)                  │
+│ - Supported: English, Hindi, Spanish, French, Arabic            │
+│ Output: Translated article versions                             │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ STEP 6: CMS UPLOAD                                               │
+│ - Hocalwire API Integration                                     │
+│ - Batch Upload with Retry Logic                                 │
+│ - Session Management                                            │
+│ Output: Published articles on Hocalwire                         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ STEP 7: SOCIAL MEDIA POSTS                                       │
+│ - Platform-specific Post Generation                             │
+│ - Twitter, LinkedIn, Instagram, Facebook                        │
+│ Output: Social media posts (JSON)                               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ DATABASE STORAGE (MongoDB)                                       │
+│ - Articles, Trends, Sessions, Metadata                          │
+└─────────────────────────────────────────────────────────────────┘
+
+DATA FLOW:
+News Sources → Scrapers → MongoDB → Trend Detector → Article Generator 
+→ Image Generator → Translator → CMS Uploader → Social Media Generator
+
+================================================================================
+3. TECHNOLOGY STACK
+================================================================================
+
+PROGRAMMING LANGUAGE:
+- Python 3.11.9 (Primary language for entire system)
+
+CORE FRAMEWORKS:
+- Flask (Web framework for frontend dashboard)
+- APScheduler (Task scheduling and automation)
+
+WEB SCRAPING:
+- newspaper3k 0.2.8 (Article extraction)
+- BeautifulSoup4 4.12.2 (HTML parsing)
+- lxml 4.9.3 (XML/HTML processing)
+- Playwright 1.40.0 (JavaScript-heavy sites)
+- requests 2.31.0 (HTTP requests)
+
+NATURAL LANGUAGE PROCESSING (NLP):
+- transformers 4.36.0 (HuggingFace transformers)
+- sentence-transformers 2.2.2 (Text embeddings)
+- langdetect 1.0.9 (Language detection)
+
+MACHINE LEARNING:
+- PyTorch 2.1.2 (Deep learning framework)
+- scikit-learn (Clustering algorithms - DBSCAN)
+
+LARGE LANGUAGE MODEL (LLM):
+- Groq API 0.4.1 (FREE LLM service)
+  - Model: Llama 3 70B (llama3-70b-8192)
+  - Alternative: Mixtral 8x7B, Llama 3 8B
+
+IMAGE GENERATION:
+- diffusers 0.25.0 (Stable Diffusion pipelines)
+- accelerate 0.25.0 (Model acceleration)
+- safetensors 0.4.1 (Safe model loading)
+- Pillow 10.1.0 (Image processing)
+- Cloudinary (Image hosting)
+
+DATABASE:
+- MongoDB 4.4+ (NoSQL document database)
+- pymongo 4.6.1 (Synchronous MongoDB driver)
+- motor 3.3.2 (Asynchronous MongoDB driver)
+
+TRANSLATION:
+- deep-translator 1.11.4 (Multi-service translation)
+  - Supports: Google Translate, MyMemory, etc.
+
+SCHEDULING & AUTOMATION:
+- APScheduler 3.10.4 (Job scheduling)
+- python-crontab 3.0.0 (Cron job management)
+- Windows Task Scheduler (Production scheduling)
+
+API INTEGRATIONS:
+- Hocalwire CMS API (Content publishing)
+- Groq API (LLM for article generation)
+- Cloudinary API (Image hosting)
+- Twitter API (tweepy 4.14.0)
+- LinkedIn API (python-linkedin 4.1)
+- Instagram API (instagrapi 2.0.0)
+- Facebook API (facebook-sdk 3.1.0)
+
+UTILITIES:
+- python-dotenv 1.0.0 (Environment variable management)
+- pyyaml 6.0.1 (YAML configuration parsing)
+- python-dateutil 2.8.2 (Date/time utilities)
+- pytz 2023.3 (Timezone handling)
+- validators 0.22.0 (Data validation)
+
+LOGGING & MONITORING:
+- loguru 0.7.2 (Advanced logging)
+
+TESTING:
+- pytest 7.4.3 (Testing framework)
+- pytest-asyncio 0.21.1 (Async testing)
+
+FRONTEND:
+- HTML5, CSS3, JavaScript (Web dashboard)
+- Flask templating (Jinja2)
+
+DEPLOYMENT:
+- Windows 10/11 or Windows Server 2019+
+- Windows Task Scheduler (Automated execution)
+
+================================================================================
+4. CORE COMPONENTS & MODULES
+================================================================================
+
+PROJECT STRUCTURE:
+osi-news-automation/
+├── src/                          # Source code
+│   ├── scrapers/                 # News scraping modules
+│   ├── trend_detection/          # Trend analysis
+│   ├── content_generation/       # Article generation
+│   ├── image_generation/         # Image creation
+│   ├── translation/              # Translation services
+│   ├── database/                 # MongoDB client
+│   ├── api_integrations/         # External API integrations
+│   ├── scheduler/                # Task scheduling
+│   └── frontend/                 # Web dashboard
+├── config/                       # Configuration files
+├── tests/                        # Test suite
+├── output/                       # Generated outputs
+├── data/                         # Data storage
+├── docs/                         # Documentation
+├── scripts/                      # Utility scripts
+├── run_automation.py             # Main entry point
+└── setup.py                      # Setup script
+
+---
+
+MODULE 1: SCRAPERS (src/scrapers/)
+-----------------------------------
+Purpose: Fetch news articles from multiple sources
+
+Files:
+- news_scraper.py (16,378 bytes)
+  * Single article scraping with newspaper3k
+  * Fallback to BeautifulSoup for custom sites
+  * Metadata extraction (title, author, date, content)
+  
+- rss_scraper.py (8,989 bytes)
+  * RSS feed parsing
+  * Multi-source feed aggregation
+  * Feed validation and error handling
+  
+- batch_scraper.py (15,543 bytes)
+  * Batch processing of multiple sources
+  * Parallel scraping with rate limiting
+  * Duplicate detection
+  * Source prioritization
+
+Technologies Used:
+- newspaper3k (primary scraper)
+- BeautifulSoup4 (HTML parsing)
+- Playwright (JavaScript sites)
+- feedparser (RSS parsing)
+- requests (HTTP)
+
+Key Functions:
+- scrape_article(url) → Article object
+- scrape_rss_feed(feed_url) → List of articles
+- scrape_news_batch(max_articles) → Batch results
+
+---
+
+MODULE 2: TREND DETECTION (src/trend_detection/)
+-------------------------------------------------
+Purpose: Identify trending topics from scraped articles
+
+Files:
+- trend_analyzer.py (16,068 bytes)
+  * Text embedding generation
+  * DBSCAN clustering algorithm
+  * Trend ranking and scoring
+  * Topic extraction
+
+Technologies Used:
+- sentence-transformers (all-MiniLM-L6-v2 model)
+- scikit-learn (DBSCAN clustering)
+- numpy (numerical operations)
+
+Algorithm:
+1. Generate embeddings for article texts
+2. Apply DBSCAN clustering (eps=0.3, min_samples=2)
+3. Identify cluster centroids as trends
+4. Rank trends by cluster size and recency
+5. Extract representative articles per trend
+
+Key Functions:
+- detect_trends(articles) → List of trends
+- cluster_articles(embeddings) → Cluster labels
+- rank_trends(clusters) → Ranked trends
+
+---
+
+MODULE 3: CONTENT GENERATION (src/content_generation/)
+-------------------------------------------------------
+Purpose: Generate comprehensive articles using LLM
+
+Files:
+- article_generator.py (20,135 bytes)
+  * Groq API integration
+  * Prompt engineering for article generation
+  * Structured content creation (intro, body, conclusion)
+  * Subheading generation
+  * Word count control (800-1200 words)
+
+Technologies Used:
+- Groq API (Llama 3 70B model)
+- langdetect (language detection)
+
+Prompt Structure:
+- Context: Trend summary + source articles
+- Instructions: Comprehensive, objective, well-structured
+- Constraints: Word count, subheadings, tone
+- Output: Full article with metadata
+
+Key Functions:
+- generate_article(trend) → Generated article
+- create_prompt(trend, sources) → LLM prompt
+- validate_article(article) → Quality check
+
+---
+
+MODULE 4: IMAGE GENERATION (src/image_generation/)
+---------------------------------------------------
+Purpose: Create AI-generated images for articles
+
+Files:
+- image_creator.py (20,468 bytes)
+  * Stable Diffusion pipeline initialization
+  * Prompt generation from article content
+  * Image generation (1024x768)
+  * Local caching
+  
+- cloudinary_uploader.py (5,636 bytes)
+  * Cloudinary API integration
+  * Image upload and URL retrieval
+  * Error handling and retry logic
+
+Technologies Used:
+- diffusers (Stable Diffusion XL)
+- PyTorch (model inference)
+- Pillow (image processing)
+- Cloudinary API
+
+Model:
+- stabilityai/stable-diffusion-xl-base-1.0
+
+Key Functions:
+- initialize_sd_pipeline() → Pipeline object
+- generate_article_image(article) → Image file
+- upload_to_cloudinary(image) → Image URL
+
+---
+
+MODULE 5: TRANSLATION (src/translation/)
+-----------------------------------------
+Purpose: Translate articles to multiple languages
+
+Files:
+- translator.py
+  * Multi-language translation
+  * Language detection
+  * Batch translation support
+
+Technologies Used:
+- deep-translator (Google Translate backend)
+- langdetect (language detection)
+
+Supported Languages:
+- English (en)
+- Hindi (hi)
+- Spanish (es)
+- French (fr)
+- Arabic (ar)
+
+Key Functions:
+- translate_article(article, target_lang) → Translated article
+- detect_language(text) → Language code
+- batch_translate(articles, languages) → Translated batch
+
+---
+
+MODULE 6: DATABASE (src/database/)
+-----------------------------------
+Purpose: MongoDB integration for data persistence
+
+Files:
+- mongo_client.py
+  * MongoDB connection management
+  * CRUD operations
+  * Session tracking
+  * Query utilities
+
+Collections:
+- articles: Scraped and generated articles
+- trends: Detected trending topics
+- scraping_sessions: Pipeline execution logs
+
+Technologies Used:
+- pymongo (synchronous operations)
+- motor (asynchronous operations)
+
+Key Functions:
+- connect() → MongoDB client
+- save_article(article) → Insert article
+- get_articles(filters) → Query articles
+- save_trend(trend) → Insert trend
+
+---
+
+MODULE 7: API INTEGRATIONS (src/api_integrations/)
+---------------------------------------------------
+Purpose: External API integrations for publishing
+
+Files:
+- hocalwire_uploader.py (16,780 bytes)
+  * Hocalwire CMS API integration
+  * Batch upload functionality
+  * Session ID generation
+  * Retry logic with exponential backoff
+  * Article formatting for CMS
+  
+- social_media_poster.py (13,107 bytes)
+  * Platform-specific post generation
+  * Character limit handling
+  * Hashtag generation
+  * Multi-platform support
+
+Technologies Used:
+- requests (HTTP API calls)
+- tweepy (Twitter API)
+- python-linkedin (LinkedIn API)
+- instagrapi (Instagram API)
+- facebook-sdk (Facebook API)
+
+Hocalwire API Endpoint:
+- POST https://api.hocalwire.com/api/v2/createfeedv2
+
+Payload Structure:
+{
+  "apiKey": "...",
+  "sessionId": "...",
+  "categoryId": 770,
+  "newsType": "CITIZEN_FEED",
+  "state": "SUBMITTED",
+  "title": "...",
+  "description": "...",
+  "tags": [...],
+  "imageUrl": "..."
+}
+
+Key Functions:
+- upload_batch_to_hocalwire(articles) → Upload results
+- generate_session_id() → Unique session ID
+- generate_social_posts(article) → Platform posts
+
+---
+
+MODULE 8: SCHEDULER (src/scheduler/)
+-------------------------------------
+Purpose: Automated task scheduling
+
+Files:
+- task_scheduler.py
+  * APScheduler configuration
+  * Interval-based scheduling (every 3 hours)
+  * Job management
+  * Error handling
+
+Technologies Used:
+- APScheduler (BackgroundScheduler)
+- python-crontab
+
+Scheduling Options:
+1. Built-in scheduler (APScheduler)
+2. Windows Task Scheduler (Production)
+
+Key Functions:
+- schedule_pipeline(interval_hours) → Scheduler
+- start_scheduler() → Start background jobs
+- stop_scheduler() → Graceful shutdown
+
+---
+
+MODULE 9: FRONTEND (src/frontend/)
+-----------------------------------
+Purpose: Web-based dashboard for monitoring
+
+Files:
+- app.py (5,698 bytes)
+  * Flask application
+  * Dashboard routes
+  * Manual scraping interface
+  * Statistics display
+  
+- templates/
+  * index.html (Dashboard UI)
+  
+- static/
+  * css/style.css (Styling)
+  * js/main.js (Frontend logic)
+
+Technologies Used:
+- Flask (web framework)
+- Jinja2 (templating)
+- HTML5, CSS3, JavaScript
+
+Features:
+- Manual article scraping
+- Pipeline statistics
+- Recent articles display
+- Trend visualization
+
+Routes:
+- GET / → Dashboard
+- POST /scrape → Manual scraping
+- GET /stats → Pipeline statistics
+
+---
+
+MODULE 10: MAIN PIPELINE (run_automation.py)
+---------------------------------------------
+Purpose: Orchestrate the complete automation pipeline
+
+File: run_automation.py (21,034 bytes)
+
+Execution Modes:
+1. once: Run pipeline once and exit
+2. dry-run: Test without uploads
+3. scheduled: Continuous execution (every 3 hours)
+
+Pipeline Steps:
+1. Scrape articles (50 max per run)
+2. Detect trends (clustering)
+3. Generate articles (LLM)
+4. Create images (optional)
+5. Translate (optional)
+6. Upload to Hocalwire
+7. Generate social posts
+
+Key Functions:
+- run_pipeline(dry_run) → Pipeline results
+- scheduled_pipeline() → Scheduled execution
+- main() → Entry point
+
+Command Line:
+python run_automation.py --mode [once|dry-run|scheduled]
+
+================================================================================
+5. LIBRARIES & DEPENDENCIES
+================================================================================
+
+COMPLETE DEPENDENCY LIST (requirements.txt):
+
+Web Scraping:
+- newspaper3k==0.2.8
+- beautifulsoup4==4.12.2
+- lxml==4.9.3
+- requests==2.31.0
+- playwright==1.40.0
+
+NLP & ML:
+- transformers==4.36.0
+- sentence-transformers==2.2.2
+- torch==2.1.2
+- langdetect==1.0.9
+
+LLM Integration:
+- groq==0.4.1
+
+Image Generation:
+- diffusers==0.25.0
+- accelerate==0.25.0
+- safetensors==0.4.1
+- pillow==10.1.0
+
+Database:
+- pymongo==4.6.1
+- motor==3.3.2
+
+Translation:
+- deep-translator==1.11.4
+
+Scheduling:
+- APScheduler==3.10.4
+- python-crontab==3.0.0
+
+API Integrations:
+- tweepy==4.14.0
+- python-linkedin==4.1
+- instagrapi==2.0.0
+- facebook-sdk==3.1.0
+
+Utilities:
+- python-dotenv==1.0.0
+- pyyaml==6.0.1
+- python-dateutil==2.8.2
+- pytz==2023.3
+- validators==0.22.0
+
+Logging:
+- loguru==0.7.2
+
+Testing:
+- pytest==7.4.3
+- pytest-asyncio==0.21.1
+
+TOTAL DEPENDENCIES: 31 packages
+
+INSTALLATION:
+pip install -r requirements.txt
+
+SYSTEM REQUIREMENTS:
+- Python 3.11.9+
+- 8GB RAM minimum (16GB for image generation)
+- 10GB free disk space
+- MongoDB 4.4+
+- Windows 10/11 or Windows Server 2019+
+
+================================================================================
+6. DATABASE SCHEMA
+================================================================================
+
+DATABASE: MongoDB
+DATABASE NAME: osi_news_automation
+
+---
+
+COLLECTION 1: articles
+-----------------------
+Purpose: Store scraped and generated articles
+
+Schema:
+{
+  "_id": ObjectId,
+  "title": String,
+  "url": String,
+  "source": String,
+  "author": String,
+  "published_date": DateTime,
+  "scraped_at": DateTime,
+  "content": String,
+  "summary": String,
+  "language": String,
+  "category": String,
+  "tags": [String],
+  "image_url": String,
+  "is_generated": Boolean,
+  "trend_id": ObjectId (reference to trends),
+  "metadata": {
+    "word_count": Integer,
+    "reading_time": Integer,
+    "sentiment": String
+  }
+}
+
+Indexes:
+- url (unique)
+- scraped_at (descending)
+- source
+- trend_id
+
+---
+
+COLLECTION 2: trends
+---------------------
+Purpose: Store detected trending topics
+
+Schema:
+{
+  "_id": ObjectId,
+  "topic": String,
+  "description": String,
+  "detected_at": DateTime,
+  "article_count": Integer,
+  "article_ids": [ObjectId],
+  "keywords": [String],
+  "cluster_id": Integer,
+  "score": Float,
+  "status": String (pending, processed, published)
+}
+
+Indexes:
+- detected_at (descending)
+- status
+- score (descending)
+
+---
+
+COLLECTION 3: scraping_sessions
+--------------------------------
+Purpose: Track pipeline execution sessions
+
+Schema:
+{
+  "_id": ObjectId,
+  "session_id": String (unique),
+  "started_at": DateTime,
+  "completed_at": DateTime,
+  "status": String (running, completed, failed),
+  "statistics": {
+    "articles_scraped": Integer,
+    "trends_detected": Integer,
+    "articles_generated": Integer,
+    "articles_uploaded": Integer,
+    "errors": Integer
+  },
+  "errors": [String],
+  "mode": String (once, scheduled, dry-run)
+}
+
+Indexes:
+- session_id (unique)
+- started_at (descending)
+- status
+
+================================================================================
+7. API INTEGRATIONS
+================================================================================
+
+API 1: GROQ API (LLM)
+---------------------
+Purpose: Article generation using Llama 3 70B
+
+Endpoint: https://api.groq.com/openai/v1/chat/completions
+Method: POST
+Authentication: Bearer token (API key)
+
+Request:
+{
+  "model": "llama3-70b-8192",
+  "messages": [
+    {"role": "system", "content": "You are a professional journalist..."},
+    {"role": "user", "content": "Generate article about..."}
+  ],
+  "temperature": 0.7,
+  "max_tokens": 2048
+}
+
+Response:
+{
+  "choices": [
+    {
+      "message": {
+        "content": "Generated article text..."
+      }
+    }
+  ]
+}
+
+Rate Limits:
+- Free tier: 30 requests/minute
+- 14,400 tokens/minute
+
+---
+
+API 2: HOCALWIRE CMS API
+------------------------
+Purpose: Publish articles to CMS
+
+Endpoint: https://api.hocalwire.com/api/v2/createfeedv2
+Method: POST
+Authentication: API key in payload
+
+Request:
+{
+  "apiKey": "Uhi7pp9Bid0e5FyMVKuN2KJiokg8TqVOYE12Bq9pjztSaRcGAMwRvQxOxGFYdCLp",
+  "sessionId": "unique-session-id",
+  "categoryId": 770,
+  "newsType": "CITIZEN_FEED",
+  "state": "SUBMITTED",
+  "title": "Article title",
+  "description": "Article content",
+  "tags": ["tag1", "tag2"],
+  "imageUrl": "https://cloudinary.com/..."
+}
+
+Response:
+{
+  "status": "success",
+  "feedId": "12345",
+  "message": "Feed created successfully"
+}
+
+---
+
+API 3: CLOUDINARY API
+---------------------
+Purpose: Image hosting
+
+Upload Endpoint: https://api.cloudinary.com/v1_1/{cloud_name}/image/upload
+Method: POST
+Authentication: API key + secret
+
+Request (multipart/form-data):
+- file: Image binary
+- upload_preset: Preset name
+- folder: Target folder
+
+Response:
+{
+  "secure_url": "https://res.cloudinary.com/...",
+  "public_id": "...",
+  "format": "jpg"
+}
+
+---
+
+API 4: TWITTER API (X)
+----------------------
+Purpose: Social media posting
+
+Library: tweepy
+Authentication: OAuth 1.0a
+
+Functions:
+- client.create_tweet(text, media_ids)
+- Character limit: 280
+
+---
+
+API 5: LINKEDIN API
+-------------------
+Purpose: Professional network posting
+
+Library: python-linkedin
+Authentication: OAuth 2.0
+
+Functions:
+- api.submit_share(comment, title, description, url)
+- Character limit: 3000
+
+---
+
+API 6: INSTAGRAM API
+--------------------
+Purpose: Visual content posting
+
+Library: instagrapi
+Authentication: Username/password
+
+Functions:
+- cl.photo_upload(path, caption)
+- Caption limit: 2200
+
+---
+
+API 7: FACEBOOK API
+-------------------
+Purpose: Social media posting
+
+Library: facebook-sdk
+Authentication: Access token
+
+Functions:
+- graph.put_object(parent_object, connection_name, message)
+- Character limit: 63,206
+
+================================================================================
+8. WORKFLOW & PIPELINE
+================================================================================
+
+AUTOMATED PIPELINE WORKFLOW:
+
+Trigger: Every 3 hours (configurable)
+
+STEP 1: INITIALIZATION
+-----------------------
+- Load environment variables (.env)
+- Connect to MongoDB
+- Initialize logging
+- Generate session ID
+
+STEP 2: NEWS SCRAPING
+----------------------
+Duration: ~5-10 minutes
+- Load news sources from config/news_sources.yaml (25 sources)
+- Parse RSS feeds
+- Scrape articles using newspaper3k
+- Extract metadata (title, author, date, content)
+- Detect duplicates (similarity threshold: 0.85)
+- Save to MongoDB (articles collection)
+- Target: 50 articles per run
+
+Output: List of scraped articles
+
+STEP 3: TREND DETECTION
+------------------------
+Duration: ~2-3 minutes
+- Retrieve recent articles (last 24 hours)
+- Generate text embeddings (sentence-transformers)
+- Apply DBSCAN clustering
+- Identify trending topics
+- Rank trends by size and recency
+- Save to MongoDB (trends collection)
+- Target: 5-10 trends
+
+Output: List of trending topics
+
+STEP 4: ARTICLE GENERATION
+---------------------------
+Duration: ~3-5 minutes
+- For each trend:
+  * Gather source articles
+  * Create LLM prompt
+  * Call Groq API (Llama 3 70B)
+  * Generate comprehensive article (800-1200 words)
+  * Add subheadings (5 per article)
+  * Validate content quality
+  * Save to MongoDB
+- Target: 5-10 generated articles
+
+Output: Generated articles
+
+STEP 5: IMAGE GENERATION (Optional)
+------------------------------------
+Duration: ~10-15 minutes (if enabled)
+- For each article:
+  * Extract key themes
+  * Generate image prompt
+  * Run Stable Diffusion pipeline
+  * Create 1024x768 image
+  * Upload to Cloudinary
+  * Update article with image URL
+
+Output: Article images
+
+STEP 6: TRANSLATION (Optional)
+-------------------------------
+Duration: ~2-3 minutes (if enabled)
+- For each article:
+  * Detect source language
+  * Translate to target languages (hi, es, fr, ar)
+  * Save translated versions
+  * Update metadata
+
+Output: Translated articles
+
+STEP 7: CMS UPLOAD
+------------------
+Duration: ~2-3 minutes
+- Batch upload to Hocalwire
+- Format articles for CMS
+- Include metadata and tags
+- Handle upload errors with retry
+- Update article status in MongoDB
+
+Output: Published article IDs
+
+STEP 8: SOCIAL MEDIA POSTS
+---------------------------
+Duration: ~1-2 minutes
+- Generate platform-specific posts:
+  * Twitter: 280 characters + hashtags
+  * LinkedIn: Professional summary
+  * Instagram: Visual caption
+  * Facebook: Engaging post
+- Save to output/json/social_posts_*.json
+- (Optional) Auto-post if enabled
+
+Output: Social media posts (JSON)
+
+STEP 9: CLEANUP & LOGGING
+--------------------------
+- Save session statistics
+- Generate pipeline report
+- Update MongoDB session
+- Rotate logs
+- Clean temporary files
+
+Total Duration: ~25-40 minutes per run
+
+EXECUTION FREQUENCY:
+- Default: Every 3 hours
+- Daily runs: 8 times
+- Weekly runs: 56 times
+- Monthly articles: ~1,120 articles
+
+================================================================================
+9. CONFIGURATION
+================================================================================
+
+CONFIGURATION FILES:
+
+1. .env (Environment Variables)
+--------------------------------
+Location: Root directory
+Purpose: Sensitive credentials and settings
+
+Key Variables:
+- MONGODB_LOCAL_URI=mongodb://localhost:27017/
+- MONGODB_DATABASE=osi_news_automation
+- GROQ_API_KEY=your_groq_api_key_here
+- GROQ_MODEL=llama3-70b-8192
+- HOCALWIRE_API_URL=https://api.hocalwire.com/api/v2/createfeedv2
+- HOCALWIRE_API_KEY=Uhi7pp9Bid0e5FyMVKuN2KJiokg8TqVOYE12Bq9pjztSaRcGAMwRvQxOxGFYdCLp
+- HOCALWIRE_CATEGORY_ID=770
+- SCRAPING_INTERVAL_HOURS=3
+- MAX_ARTICLES_PER_RUN=50
+- ARTICLE_MIN_WORDS=800
+- ARTICLE_MAX_WORDS=1200
+- IMAGE_GENERATION_ENABLED=false
+- TRANSLATION_ENABLED=false
+- LOG_LEVEL=INFO
+
+2. config/news_sources.yaml
+----------------------------
+Location: config/
+Purpose: News source configuration
+
+Structure:
+sources:
+  - name: "BBC News"
+    url: "https://www.bbc.com/news"
+    rss_feed: "https://feeds.bbci.co.uk/news/rss.xml"
+    region: "UK"
+    language: "en"
+    scrape_method: "newspaper3k"
+    priority: 1
+    enabled: true
+    rate_limit_delay: 2
+
+Total Sources: 25 international news outlets
+
+Source Tiers:
+- Tier 1 (Priority 1): BBC, Reuters, Al Jazeera, CNN, NYT
+- Tier 2 (Priority 2): Guardian, India Today, The Hindu, TOI, HT, NDTV
+- Tier 3 (Priority 3): France 24, Deutsche Welle, RT, China Daily, Japan Times
+- Tier 4 (Priority 4): Dawn, Arab News, Haaretz, CBC
+
+3. config/api_config.yaml
+--------------------------
+Location: config/
+Purpose: API endpoint configuration
+
+4. config/production.env
+-------------------------
+Location: config/
+Purpose: Production-specific settings
+
+================================================================================
+10. DEPLOYMENT
+================================================================================
+
+DEPLOYMENT PLATFORM: Windows 10/11 or Windows Server 2019+
+
+DEPLOYMENT STEPS:
+
+1. SYSTEM PREPARATION
+----------------------
+- Install Python 3.11.9
+- Install MongoDB 4.4+
+- Install Git (optional)
+
+2. PROJECT SETUP
+----------------
+cd "C:\Users\Jain\Desktop\OSI News Automation System\osi-news-automation"
+pip install -r requirements.txt
+copy .env.example .env
+# Edit .env with credentials
+
+3. DATABASE SETUP
+-----------------
+- Start MongoDB service
+- Create database: osi_news_automation
+- Collections auto-created on first run
+
+4. TESTING
+----------
+python run_automation.py --mode dry-run
+
+5. SCHEDULING (Production)
+---------------------------
+Option A: Windows Task Scheduler
+cd scripts
+setup_windows_scheduler.bat
+
+Option B: Built-in Scheduler
+python run_automation.py --mode scheduled
+
+6. MONITORING
+-------------
+- Check logs: output/logs/automation_*.log
+- View dashboard: python src/frontend/app.py
+- MongoDB queries: mongo osi_news_automation
+
+DEPLOYMENT CHECKLIST:
+☐ Python 3.11.9 installed
+☐ MongoDB running
+☐ Dependencies installed
+☐ .env configured
+☐ News sources configured
+☐ Dry-run successful
+☐ Scheduled task created
+☐ Logging verified
+☐ Database accessible
+☐ API keys valid
+
+================================================================================
+11. MONITORING & LOGGING
+================================================================================
+
+LOGGING SYSTEM: loguru
+
+Log Levels:
+- DEBUG: Detailed debugging information
+- INFO: General information (default)
+- WARNING: Warning messages
+- ERROR: Error messages
+- CRITICAL: Critical failures
+
+Log Files:
+Location: output/logs/
+Format: automation_YYYY-MM-DD.log
+Rotation: Daily + 10 MB size limit
+Retention: 30 days
+
+Log Structure:
+2026-01-23 15:46:14 | INFO | Pipeline started (session: abc123)
+2026-01-23 15:46:20 | INFO | Scraped 50 articles from 25 sources
+2026-01-23 15:46:25 | INFO | Detected 8 trending topics
+2026-01-23 15:46:35 | INFO | Generated 8 articles
+2026-01-23 15:46:40 | INFO | Uploaded 8 articles to Hocalwire
+2026-01-23 15:46:42 | INFO | Pipeline completed successfully
+
+Output Files:
+- output/json/pipeline_stats_*.json (Pipeline statistics)
+- output/json/social_posts_*.json (Social media posts)
+- output/json/scraped_*.json (Scraped articles from frontend)
+
+Monitoring Commands:
+# View today's log
+type output\logs\automation_2026-01-23.log
+
+# Search for errors
+findstr /i "error" output\logs\automation_*.log
+
+# View task status
+schtasks /query /tn "OSI News Automation"
+
+Health Checks:
+- Database connectivity
+- API availability (Groq, Hocalwire)
+- Disk space
+- Memory usage
+- Pipeline execution time
+
+================================================================================
+12. FILE STRUCTURE
+================================================================================
+
+COMPLETE PROJECT STRUCTURE:
+
+osi-news-automation/
+│
+├── .env                          # Environment variables (SECRET)
+├── .env.example                  # Environment template
+├── .gitignore                    # Git ignore rules
+├── README.md                     # Project overview
+├── requirements.txt              # Python dependencies
+├── run_automation.py             # Main pipeline orchestrator
+├── setup.py                      # Setup script
+│
+├── config/                       # Configuration files
+│   ├── api_config.yaml           # API configurations
+│   ├── news_sources.yaml         # News source definitions (25 sources)
+│   ├── production.env            # Production settings
+│   └── settings.py               # Python settings
+│
+├── src/                          # Source code
+│   ├── __init__.py
+│   │
+│   ├── scrapers/                 # News scraping modules
+│   │   ├── __init__.py
+│   │   ├── news_scraper.py       # Single article scraper
+│   │   ├── rss_scraper.py        # RSS feed parser
+│   │   └── batch_scraper.py      # Batch scraping orchestrator
+│   │
+│   ├── trend_detection/          # Trend analysis
+│   │   ├── __init__.py
+│   │   └── trend_analyzer.py     # Clustering & trend detection
+│   │
+│   ├── content_generation/       # Article generation
+│   │   ├── __init__.py
+│   │   └── article_generator.py  # LLM-based article creation
+│   │
+│   ├── image_generation/         # Image creation
+│   │   ├── __init__.py
+│   │   ├── image_creator.py      # Stable Diffusion pipeline
+│   │   └── cloudinary_uploader.py # Image hosting
+│   │
+│   ├── translation/              # Translation services
+│   │   ├── __init__.py
+│   │   └── translator.py         # Multi-language translation
+│   │
+│   ├── database/                 # MongoDB integration
+│   │   ├── __init__.py
+│   │   └── mongo_client.py       # Database client
+│   │
+│   ├── api_integrations/         # External APIs
+│   │   ├── __init__.py
+│   │   ├── hocalwire_uploader.py # CMS upload
+│   │   └── social_media_poster.py # Social media posts
+│   │
+│   ├── scheduler/                # Task scheduling
+│   │   ├── __init__.py
+│   │   └── task_scheduler.py     # APScheduler integration
+│   │
+│   └── frontend/                 # Web dashboard
+│       ├── app.py                # Flask application
+│       ├── templates/
+│       │   └── index.html        # Dashboard UI
+│       └── static/
+│           ├── css/
+│           │   └── style.css     # Styling
+│           └── js/
+│               └── main.js       # Frontend logic
+│
+├── tests/                        # Test suite
+│   ├── __init__.py
+│   ├── test_scrapers.py
+│   ├── test_trends.py
+│   ├── test_generator.py
+│   └── test_database.py
+│
+├── output/                       # Generated outputs
+│   ├── logs/                     # Log files
+│   │   └── automation_*.log
+│   └── json/                     # JSON outputs
+│       ├── pipeline_stats_*.json
+│       └── social_posts_*.json
+│
+├── data/                         # Data storage
+│   └── (temporary files)
+│
+├── docs/                         # Documentation
+│   ├── API_DOCUMENTATION.md
+│   ├── DEPLOYMENT.md
+│   ├── MONITORING.md
+│   ├── PRODUCTION_CHECKLIST.md
+│   └── QUICKSTART.md
+│
+└── scripts/                      # Utility scripts
+    ├── setup_windows_scheduler.bat
+    ├── health_check.py
+    └── monitoring.py
+
+Total Files: 50+
+Total Lines of Code: ~150,000+
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
+
+This documentation covers the complete OSI News Automation System including:
+✓ Architecture and design patterns
+✓ Complete technology stack
+✓ All components and modules
+✓ Library dependencies
+✓ Database schema
+✓ API integrations
+✓ Workflow and pipeline
+✓ Configuration details
+✓ Deployment procedures
+✓ Monitoring and logging
+✓ Complete file structure
+
+For additional information, refer to the docs/ directory or contact the
+development team.
+
+Last Updated: January 23, 2026
+Version: 1.0

@@ -1,0 +1,115 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# Environment Variables (CRITICAL - Never commit!)
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+output/logs/
+logs/
+
+# Output directories
+output/
+*.json
+!requirements.txt
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# MongoDB
+data/
+
+# Images (too large for git)
+output/images/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+!static/*.png
+!static/*.jpg
+
+# Models (too large for git)
+models/
+*.bin
+*.safetensors
+*.ckpt
+*.pth
+
+# Temp files
+*.tmp
+*.temp
+*.cache
+
+# OS Files
+Thumbs.db
+.DS_Store
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+*.ipynb
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node (if any)
+node_modules/
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.py.backup
+
+# Sensitive data
+config/production.env
+*.key
+*.pem
+*.crt
+
+# API Keys and Secrets (extra safety)
+*secret*
+*credential*
+*token*
+.credentials/

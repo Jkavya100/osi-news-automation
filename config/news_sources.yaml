@@ -1,0 +1,453 @@
+# ============================================
+# OSI News Automation System - News Sources Configuration
+# ============================================
+# 25 International News Sources for Scraping
+# Last Updated: 2026-01-15
+# 
+# IMPORTANT: Always respect robots.txt and terms of service
+# Use rate limiting to avoid being blocked
+# ============================================
+
+sources:
+  # ===========================================
+  # TIER 1: Major International News (Priority 1)
+  # ===========================================
+  
+  - name: "BBC News"
+    url: "https://www.bbc.com/news"
+    rss_feed: "https://feeds.bbci.co.uk/news/rss.xml"
+    backup_url: "https://www.bbc.co.uk/news"
+    region: "UK"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.gs-c-promo"
+      article_url: "a.gs-c-promo-heading"
+      headline: "h1#main-heading"
+      content: "article[data-component='text-block']"
+    priority: 1
+    enabled: true
+    rate_limit_delay: 2
+
+  - name: "Reuters"
+    url: "https://www.reuters.com"
+    rss_feed: "https://www.reuters.com/rssfeed/topNews"
+    backup_url: "https://www.reuters.com/world"
+    region: "International"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.media-story-card"
+      article_url: "a[data-testid='Heading']"
+      headline: "h1[data-testid='Heading']"
+      content: "div[data-testid='article-body']"
+    priority: 1
+    enabled: true
+    rate_limit_delay: 3
+
+  - name: "Al Jazeera"
+    url: "https://www.aljazeera.com"
+    rss_feed: "https://www.aljazeera.com/xml/rss/all.xml"
+    backup_url: "https://www.aljazeera.com/news"
+    region: "Middle East"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "article.gc"
+      article_url: "a.u-clickable-card__link"
+      headline: "h1.article-header"
+      content: "div.wysiwyg"
+    priority: 1
+    enabled: true
+    rate_limit_delay: 2
+
+  - name: "CNN"
+    url: "https://www.cnn.com"
+    rss_feed: "http://rss.cnn.com/rss/edition.rss"
+    backup_url: "https://edition.cnn.com"
+    region: "US"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.container__item"
+      article_url: "a.container__link"
+      headline: "h1.headline__text"
+      content: "div.article__content"
+    priority: 1
+    enabled: true
+    rate_limit_delay: 3
+
+  - name: "The New York Times"
+    url: "https://www.nytimes.com"
+    rss_feed: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+    backup_url: "https://www.nytimes.com/section/world"
+    region: "US"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "article"
+      article_url: "a[data-testid='internal-link']"
+      headline: "h1[data-testid='headline']"
+      content: "section[name='articleBody']"
+    priority: 1
+    enabled: true
+    rate_limit_delay: 4
+
+  # ===========================================
+  # TIER 2: Major Regional News (Priority 2)
+  # ===========================================
+
+  - name: "The Guardian"
+    url: "https://www.theguardian.com"
+    rss_feed: "https://www.theguardian.com/world/rss"
+    backup_url: "https://www.theguardian.com/international"
+    region: "UK"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.fc-item"
+      article_url: "a.fc-item__link"
+      headline: "h1.dcr-y70mar"
+      content: "div#maincontent"
+    priority: 2
+    enabled: true
+    rate_limit_delay: 2
+
+  - name: "India Today"
+    url: "https://www.indiatoday.in"
+    rss_feed: "https://www.indiatoday.in/rss/home"
+    backup_url: "https://www.indiatoday.in/india"
+    region: "India"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.story"
+      article_url: "a.story__link"
+      headline: "h1.story__title"
+      content: "div.story__content"
+    priority: 2
+    enabled: true
+    rate_limit_delay: 2
+
+  - name: "The Hindu"
+    url: "https://www.thehindu.com"
+    rss_feed: "https://www.thehindu.com/news/feeder/default.rss"
+    backup_url: "https://www.thehindu.com/news/national"
+    region: "India"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.story-card"
+      article_url: "a.story-card__link"
+      headline: "h1.title"
+      content: "div.article-body"
+    priority: 2
+    enabled: true
+    rate_limit_delay: 2
+
+  - name: "Times of India"
+    url: "https://timesofindia.indiatimes.com"
+    rss_feed: "https://timesofindia.indiatimes.com/rssfeedstopstories.cms"
+    backup_url: "https://timesofindia.indiatimes.com/india"
+    region: "India"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.list_content"
+      article_url: "a.w_img"
+      headline: "h1.HNMDR"
+      content: "div._3YYSt"
+    priority: 2
+    enabled: true
+    rate_limit_delay: 2
+
+  - name: "Hindustan Times"
+    url: "https://www.hindustantimes.com"
+    rss_feed: "https://www.hindustantimes.com/feeds/rss/india-news/rssfeed.xml"
+    backup_url: "https://www.hindustantimes.com/india-news"
+    region: "India"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.cartHolder"
+      article_url: "a.hdg3"
+      headline: "h1.hdg1"
+      content: "div.storyDetails"
+    priority: 2
+    enabled: true
+    rate_limit_delay: 2
+
+  - name: "NDTV"
+    url: "https://www.ndtv.com"
+    rss_feed: "https://feeds.feedburner.com/ndtvnews-top-stories"
+    backup_url: "https://www.ndtv.com/india"
+    region: "India"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.news_item"
+      article_url: "a.item-title"
+      headline: "h1.sp-ttl"
+      content: "div.sp-cn"
+    priority: 2
+    enabled: true
+    rate_limit_delay: 2
+
+  - name: "The Washington Post"
+    url: "https://www.washingtonpost.com"
+    rss_feed: "https://feeds.washingtonpost.com/rss/world"
+    backup_url: "https://www.washingtonpost.com/world"
+    region: "US"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.card"
+      article_url: "a.card-headline"
+      headline: "h1.headline"
+      content: "article.body"
+    priority: 2
+    enabled: true
+    rate_limit_delay: 4
+
+  - name: "Associated Press"
+    url: "https://apnews.com"
+    rss_feed: "https://apnews.com/apf-topnews/feed"
+    backup_url: "https://apnews.com/world-news"
+    region: "US"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.PagePromo"
+      article_url: "a.Link"
+      headline: "h1.Page-headline"
+      content: "div.RichTextStoryBody"
+    priority: 2
+    enabled: true
+    rate_limit_delay: 3
+
+  # ===========================================
+  # TIER 3: European News (Priority 3)
+  # ===========================================
+
+  - name: "France 24"
+    url: "https://www.france24.com/en"
+    rss_feed: "https://www.france24.com/en/rss"
+    backup_url: "https://www.france24.com/en/europe"
+    region: "France"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "article.article"
+      article_url: "a.article__link"
+      headline: "h1.article__title"
+      content: "div.article__content"
+    priority: 3
+    enabled: true
+    rate_limit_delay: 2
+
+  - name: "Deutsche Welle"
+    url: "https://www.dw.com/en"
+    rss_feed: "https://rss.dw.com/rdf/rss-en-all"
+    backup_url: "https://www.dw.com/en/top-stories"
+    region: "Germany"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.teaser"
+      article_url: "a.teaser-link"
+      headline: "h1.article-header"
+      content: "div.article-body"
+    priority: 3
+    enabled: true
+    rate_limit_delay: 2
+
+  - name: "RT"
+    url: "https://www.rt.com"
+    rss_feed: "https://www.rt.com/rss/news"
+    backup_url: "https://www.rt.com/news"
+    region: "Russia"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.card"
+      article_url: "a.card__heading"
+      headline: "h1.article__heading"
+      content: "div.article__text"
+    priority: 3
+    enabled: true
+    rate_limit_delay: 3
+
+  # ===========================================
+  # TIER 4: Asia-Pacific News (Priority 3)
+  # ===========================================
+
+  - name: "China Daily"
+    url: "https://www.chinadaily.com.cn"
+    rss_feed: "https://www.chinadaily.com.cn/rss/world_rss.xml"
+    backup_url: "https://www.chinadaily.com.cn/world"
+    region: "China"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.mb10-tw"
+      article_url: "a.tw3_01_2"
+      headline: "h1#Title"
+      content: "div#Content"
+    priority: 3
+    enabled: true
+    rate_limit_delay: 3
+
+  - name: "Japan Times"
+    url: "https://www.japantimes.co.jp"
+    rss_feed: "https://www.japantimes.co.jp/feed"
+    backup_url: "https://www.japantimes.co.jp/news"
+    region: "Japan"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "article.post"
+      article_url: "a.post__title"
+      headline: "h1.single__title"
+      content: "div.single__content"
+    priority: 3
+    enabled: true
+    rate_limit_delay: 2
+
+  - name: "The Straits Times"
+    url: "https://www.straitstimes.com"
+    rss_feed: "https://www.straitstimes.com/news/singapore/rss.xml"
+    backup_url: "https://www.straitstimes.com/global"
+    region: "Singapore"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.card-article"
+      article_url: "a.stretched-link"
+      headline: "h1.headline"
+      content: "div.article-content"
+    priority: 3
+    enabled: true
+    rate_limit_delay: 3
+
+  - name: "South China Morning Post"
+    url: "https://www.scmp.com"
+    rss_feed: "https://www.scmp.com/rss/91/feed"
+    backup_url: "https://www.scmp.com/news/asia"
+    region: "Hong Kong"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.article-card"
+      article_url: "a.article-card__link"
+      headline: "h1.article-header__title"
+      content: "div.article-body"
+    priority: 3
+    enabled: true
+    rate_limit_delay: 3
+
+  - name: "The Australian"
+    url: "https://www.theaustralian.com.au"
+    rss_feed: "https://www.theaustralian.com.au/feed"
+    backup_url: "https://www.theaustralian.com.au/nation"
+    region: "Australia"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.story-block"
+      article_url: "a.story-block__link"
+      headline: "h1.story__headline"
+      content: "div.story__body"
+    priority: 3
+    enabled: true
+    rate_limit_delay: 3
+
+  # ===========================================
+  # TIER 5: Regional News (Priority 4)
+  # ===========================================
+
+  - name: "Dawn"
+    url: "https://www.dawn.com"
+    rss_feed: "https://www.dawn.com/feeds/home"
+    backup_url: "https://www.dawn.com/pakistan"
+    region: "Pakistan"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "article.story"
+      article_url: "a.story__link"
+      headline: "h2.story__title"
+      content: "div.story__content"
+    priority: 4
+    enabled: true
+    rate_limit_delay: 2
+
+  - name: "Arab News"
+    url: "https://www.arabnews.com"
+    rss_feed: "https://www.arabnews.com/rss.xml"
+    backup_url: "https://www.arabnews.com/middle-east"
+    region: "Saudi Arabia"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.article-item"
+      article_url: "a.article-item__link"
+      headline: "h1.article-title"
+      content: "div.article-text"
+    priority: 4
+    enabled: true
+    rate_limit_delay: 2
+
+  - name: "Haaretz"
+    url: "https://www.haaretz.com"
+    rss_feed: "https://www.haaretz.com/srv/haaretz-latest-headlines"
+    backup_url: "https://www.haaretz.com/israel-news"
+    region: "Israel"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "article.teaser"
+      article_url: "a.teaser-link"
+      headline: "h1.article-header"
+      content: "div.article-body"
+    priority: 4
+    enabled: true
+    rate_limit_delay: 3
+
+  - name: "CBC News"
+    url: "https://www.cbc.ca/news"
+    rss_feed: "https://www.cbc.ca/webfeed/rss/rss-topstories"
+    backup_url: "https://www.cbc.ca/news/world"
+    region: "Canada"
+    language: "en"
+    scrape_method: "newspaper3k"
+    selectors:
+      article_list: "div.card"
+      article_url: "a.card-link"
+      headline: "h1.detailHeadline"
+      content: "div.story"
+    priority: 4
+    enabled: true
+    rate_limit_delay: 2
+
+# ===========================================
+# CONFIGURATION NOTES
+# ===========================================
+# Priority Levels:
+#   1 = Highest (Major international sources, most reliable)
+#   2 = High (Major regional sources)
+#   3 = Medium (Secondary international sources)
+#   4 = Lower (Regional/specialized sources)
+#   5 = Lowest (Backup sources)
+#
+# Scrape Methods:
+#   - newspaper3k: Best for standard news sites
+#   - beautifulsoup: For sites with custom structure
+#   - playwright: For JavaScript-heavy sites
+#
+# Rate Limiting:
+#   - Always respect robots.txt
+#   - Minimum 2 second delay between requests
+#   - Higher delays for stricter sites (NYT, WaPo)
+#
+# Selectors may need periodic updates as sites change their HTML
+# ============================================

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSI News Automation - Results Viewer</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <span class="logo-icon">📰</span>
+                    <h1>OSI News Automation</h1>
+                </div>
+                <div class="header-stats">
+                    <span id="article-count" class="stat-badge">0 Articles</span>
+                    <span id="last-updated" class="stat-time">Not scraped yet</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Controls -->
+        <div class="controls">
+            <div class="control-group">
+                <label for="max-articles">Max Articles:</label>
+                <input type="number" id="max-articles" value="10" min="1" max="50">
+            </div>
+            <button id="btn-scrape" class="btn btn-primary">
+                <span class="btn-icon">🔄</span> Run Scraper
+            </button>
+            <button id="btn-save" class="btn btn-secondary">
+                <span class="btn-icon">💾</span> Save JSON
+            </button>
+            <button id="btn-load" class="btn btn-secondary">
+                <span class="btn-icon">📂</span> Load Last
+            </button>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <span>Scraping articles...</span>
+        </div>
+
+        <!-- Status Message -->
+        <div id="status-message" class="status-message hidden"></div>
+
+        <!-- Articles Grid -->
+        <main class="articles-container">
+            <div id="articles-grid" class="articles-grid">
+                <div class="empty-state">
+                    <span class="empty-icon">📭</span>
+                    <p>No articles yet. Click "Run Scraper" to fetch news articles.</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Article Detail Modal -->
+        <div id="article-modal" class="modal hidden">
+            <div class="modal-content">
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <div id="modal-body"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
