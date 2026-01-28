@@ -229,6 +229,21 @@ SOURCE MATERIALS (for reference only):
 {triage_guidance}
 {specialized_protocol}
 
+🚨 CRITICAL TOPIC FOCUS RULES - READ CAREFULLY:
+1. The MAIN TOPIC is: "{topic}"
+2. You MUST write EXCLUSIVELY about this topic
+3. If you see MULTIPLE DIFFERENT topics in the sources (e.g., Gaza conflict AND Australian Open tennis), you MUST:
+   a) Identify which content relates to the MAIN TOPIC: "{topic}"
+   b) COMPLETELY IGNORE all content about other unrelated topics
+   c) DO NOT mention, reference, or include ANY information about unrelated topics
+4. Even if a source article contains mixed content, extract ONLY the parts relevant to "{topic}"
+5. If unsure whether content is related, ASK: "Does this directly relate to {topic}?" If NO, exclude it.
+
+EXAMPLES OF WHAT TO EXCLUDE:
+❌ If main topic is "Gaza Conflict" - DO NOT include: sports, entertainment, weather, unrelated countries
+❌ If main topic is "Australian Open" - DO NOT include: wars, conflicts, politics in other countries
+❌ If main topic is "Climate Summit" - DO NOT include: sports results, celebrity news, unrelated events
+
 CRITICAL WRITING RULES:
 1. Write as if YOU are the news organization directly reporting this story
 2. DO NOT use phrases like:
@@ -238,27 +253,32 @@ CRITICAL WRITING RULES:
    - "Al Jazeera reported..."
    - DO NOT mention any source names in the article
 3. Write in DIRECT journalistic voice - state facts directly
-4. Focus ONLY on the main topic - do not include unrelated news
-5. If the sources discuss different events, pick the MAIN story and focus on that
+4. Focus ONLY on the main topic "{topic}" - ABSOLUTELY NO unrelated news
+5. If the sources discuss different events, pick ONLY the content about "{topic}"
 6. Use objective, factual, AP Style journalism
 7. Apply the SPECIALIZED PROTOCOL sections above based on story type
+8. TRIPLE-CHECK before including any sentence: "Is this about {topic}? YES or NO?"
 
 ARTICLE REQUIREMENTS:
-1. Write a compelling headline (10-15 words)
+1. Write a compelling headline (10-15 words) about "{topic}" ONLY
 2. Create a comprehensive article of at least {target_words} words{subheading_instruction}
 4. Start with proper dateline (e.g., "DUBAI, January 23 –")
-5. Strong lead paragraph: who, what, when, where, why
+5. Strong lead paragraph: who, what, when, where, why - ALL about "{topic}"
 6. Use clear subheadings to organize the story (follow specialized protocol if applicable)
-7. End with implications or future outlook
+7. End with implications or future outlook for "{topic}"
 8. Use factual, professional tone throughout
+9. EVERY paragraph must be about "{topic}" - no exceptions
 
 IMPORTANT - WHAT TO AVOID:
 ❌ DO NOT write "according to", "as reported by", "sources say"  
 ❌ DO NOT mention BBC, Reuters, CNN, or any news organization names
-❌ DO NOT combine multiple unrelated stories
+❌ DO NOT combine multiple unrelated stories (e.g., Gaza + Tennis)
+❌ DO NOT include content about topics unrelated to "{topic}"
 ❌ DO NOT include your own opinions or speculation
 ❌ DO NOT fabricate information not in sources
 ❌ DO NOT include Tier 4 information (unverified, promotional)
+❌ DO NOT mention sports/entertainment if main topic is politics/conflict
+❌ DO NOT mention conflicts/wars if main topic is sports/entertainment
 
 WRITING STYLE:
 ✅ "A car accident in Dubai has claimed the life of 19-year-old Marcus Fakana..."
@@ -267,21 +287,24 @@ WRITING STYLE:
 
 ❌ NOT: "According to BBC News, a car accident occurred..."
 ❌ NOT: "Sources report that the incident..."
+❌ NOT: "Meanwhile, in a separate development, [unrelated topic]..."
 
 OUTPUT FORMAT:
-# [Headline - Direct and Clear]
+# [Headline - Direct and Clear - ONLY about "{topic}"]
 
 [DATELINE], [Date] –
 
-[Lead paragraph stating the main facts directly]
+[Lead paragraph stating the main facts directly - ONLY about "{topic}"]
 
 ## [First Subheading - follow specialized protocol if applicable]
-[Content about this specific aspect]
+[Content about this specific aspect of "{topic}"]
 
 ## [Second Subheading]  
-[Content about another aspect]
+[Content about another aspect of "{topic}"]
 
-[Continue with relevant subheadings...]
+[Continue with relevant subheadings - ALL about "{topic}"...]
+
+FINAL REMINDER: This article is 100% about "{topic}". Do NOT include ANY content about other topics.
 
 Write the article NOW in direct journalistic voice with {story_type.upper()} story analysis:"""
     
@@ -364,6 +387,79 @@ def parse_generated_article(generated_text: str) -> Dict:
         "heading": heading,
         "story": story
     }
+
+
+def validate_topic_focus(article: Dict, topic: str, source_articles: List[Dict]) -> Dict:
+    """
+    Validate that the generated article stays focused on the main topic.
+    
+    Checks for potential topic drift by looking for unrelated content.
+    
+    Args:
+        article: Generated article dictionary
+        topic: Main topic name
+        source_articles: Original source articles
+        
+    Returns:
+        Dictionary with validation results
+    """
+    story_lower = article.get('story', '').lower()
+    heading_lower = article.get('heading', '').lower()
+    topic_lower = topic.lower()
+    
+    # Common unrelated topic indicators
+    unrelated_signals = {
+        'sports': ['tennis', 'football', 'basketball', 'cricket', 'match', 'tournament', 
+                  'championship', 'semifinals', 'finals', 'player', 'scored', 'defeated'],
+        'entertainment': ['movie', 'film', 'actor', 'actress', 'celebrity', 'album', 
+                         'concert', 'performance', 'singer', 'artist'],
+        'conflict': ['war', 'military', 'conflict', 'gaza', 'ukraine', 'soldiers', 
+                    'bombing', 'attack', 'humanitarian crisis'],
+        'politics': ['election', 'government', 'president', 'parliament', 'minister', 
+                    'political party', 'vote', 'legislation'],
+        'weather': ['storm', 'hurricane', 'weather', 'temperature', 'forecast', 
+                   'precipitation', 'climate pattern']
+    }
+    
+    # Determine main topic category from the topic name
+    main_category = None
+    for category, keywords in unrelated_signals.items():
+        if any(kw in topic_lower for kw in keywords):
+            main_category = category
+            break
+    
+    if not main_category:
+        # Generic topic - less strict validation
+        return {'is_focused': True, 'warnings': []}
+    
+    # Check for keywords from OTHER categories
+    warnings = []
+    detected_categories = set()
+    
+    for category, keywords in unrelated_signals.items():
+        if category == main_category:
+            continue
+            
+        # Check if unrelated keywords appear in the article
+        found_keywords = [kw for kw in keywords if kw in story_lower or kw in heading_lower]
+        
+        if found_keywords:
+            detected_categories.add(category)
+            warnings.append(f"⚠️ Detected {category} content: {', '.join(found_keywords[:3])}")
+    
+    is_focused = len(detected_categories) == 0
+    
+    if not is_focused:
+        logger.warning(f"Topic drift detected in article about '{topic}':")
+        for warning in warnings:
+            logger.warning(f"  {warning}")
+    
+    return {
+        'is_focused': is_focused,
+        'warnings': warnings,
+        'detected_categories': list(detected_categories)
+    }
+
 
 
 # ===========================================
@@ -493,7 +589,7 @@ def generate_article(
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a professional news journalist for a major international news agency. Write comprehensive, balanced, factual news articles by synthesizing multiple sources. Follow AP style guidelines. Create engaging, informative content."
+                        "content": "You are a professional news journalist for a major international news agency. Write comprehensive, balanced, factual news articles by synthesizing multiple sources. Follow AP style guidelines. CRITICAL: Each article must focus on ONE SINGLE TOPIC ONLY. If you receive sources about multiple different topics, identify the main topic and write EXCLUSIVELY about that topic. NEVER mix unrelated topics (e.g., do not combine Gaza conflict with Australian Open tennis). Focus is paramount."
                     },
                     {
                         "role": "user",
@@ -522,6 +618,14 @@ def generate_article(
                 logger.warning(f"Article too short ({word_count} words), retrying...")
                 continue
             
+            # Validate topic focus - check for unrelated content
+            validation = validate_topic_focus(article, topic, source_articles)
+            
+            if not validation['is_focused']:
+                logger.warning(f"⚠️ Article may contain unrelated content about: {', '.join(validation['detected_categories'])}")
+                logger.warning(f"Main topic should be: '{topic}'")
+                # Log warnings but still proceed - manual review recommended
+            
             # Add metadata
             article['dateline'] = infer_dateline(source_articles)
             article['timestamp'] = format_timestamp()
@@ -535,6 +639,7 @@ def generate_article(
             article['keywords'] = trend.get('keywords', [])[:10]
             article['generated_at'] = datetime.utcnow().isoformat()
             article['model_used'] = model
+            article['validation'] = validation  # Add validation results to metadata
             
             logger.info(f"✅ Generated article: '{article['heading'][:50]}...'")
             logger.info(f"   Word count: {article['word_count']}")
