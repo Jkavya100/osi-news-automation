@@ -58,7 +58,7 @@ class MongoDBClient:
         self.sessions = None
         
         # Sentence transformer for duplicate detection (lazy loaded)
-        self._embedding_model: Optional[SentenceTransformer] = None
+        self._embedding_model = None
         self._embedding_cache: Dict[str, List[float]] = {}
         
         # Connection state
@@ -67,12 +67,16 @@ class MongoDBClient:
         logger.info(f"MongoDBClient initialized for database: {self.database_name}")
     
     @property
-    def embedding_model(self) -> SentenceTransformer:
-        """Lazy load the sentence transformer model."""
+    def embedding_model(self):
+        """Lazy load the sentence transformer model (if available)."""
         if self._embedding_model is None:
-            logger.info("Loading sentence transformer model...")
-            self._embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-            logger.info("Sentence transformer model loaded successfully")
+            try:
+                from sentence_transformers import SentenceTransformer
+                logger.info("Loading sentence transformer model...")
+                self._embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+                logger.info("Sentence transformer model loaded successfully")
+            except ImportError:
+                logger.warning("sentence-transformers not installed, embedding-based dedup disabled")
         return self._embedding_model
     
     def connect(self) -> bool:
