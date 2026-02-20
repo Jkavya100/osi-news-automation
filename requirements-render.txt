@@ -7,7 +7,6 @@ newspaper3k==0.2.8
 beautifulsoup4==4.12.2
 lxml==4.9.3
 requests==2.31.0
-langdetect==1.0.9
 feedparser==6.0.10
 
 # NLP / Embeddings (needed for duplicate detection)
