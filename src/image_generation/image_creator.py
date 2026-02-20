@@ -31,8 +31,9 @@ load_dotenv()
 # CONFIGURATION
 # ===========================================
 
-HF_API_URL = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-3.5-large"
-HF_MODEL_NAME = "stabilityai/stable-diffusion-3.5-large"
+# FLUX.1-schnell via HuggingFace Serverless Inference (free, no license required)
+HF_API_URL = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
+HF_MODEL_NAME = "black-forest-labs/FLUX.1-schnell"
 
 
 def is_image_generation_enabled() -> bool:
