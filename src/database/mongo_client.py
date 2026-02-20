@@ -41,8 +41,10 @@ class MongoDBClient:
             database_name: Database name. If None, reads from environment.
         """
         # Load from environment if not provided
-        self.uri = uri or os.getenv("MONGODB_LOCAL_URI", "mongodb://localhost:27017/")
-        self.database_name = database_name or os.getenv("MONGODB_DATABASE", "osi_news_automation")
+        # MONGO_URI = cloud Atlas connection string (set on Render/production)
+        # MONGODB_LOCAL_URI = localhost fallback for local development
+        self.uri = uri or os.getenv("MONGO_URI") or os.getenv("MONGODB_LOCAL_URI", "mongodb://localhost:27017/")
+        self.database_name = database_name or os.getenv("MONGO_DB_NAME") or os.getenv("MONGODB_DATABASE", "osi_news_automation")
         
         # Collection names from environment
         self.articles_collection_name = os.getenv("MONGODB_COLLECTION_ARTICLES", "articles")

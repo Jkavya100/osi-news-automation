@@ -1,0 +1,58 @@
+services:
+  # Background Worker: runs the scheduled pipeline every 3 hours
+  - type: worker
+    name: osi-news-automation
+    runtime: python
+    repo: https://github.com/Jkavya100/osi-news-automation
+    branch: main
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: python run_automation.py --mode scheduled
+    plan: free
+    envVars:
+      # ---- Groq LLM ----
+      - key: GROQ_API_KEY
+        sync: false
+      # ---- HuggingFace ----
+      - key: HF_ACCESS_TOKEN
+        sync: false
+      # ---- MongoDB Atlas ----
+      - key: MONGO_URI
+        sync: false
+      - key: MONGO_DB_NAME
+        value: osi_news_automation
+      # ---- Cloudinary ----
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      # ---- Hocalwire ----
+      - key: HOCALWIRE_API_URL
+        value: https://democracynewslive.com/dev/h-api/createFeedV2
+      - key: HOCALWIRE_API_KEY
+        sync: false
+      - key: HOCALWIRE_USER_SESSION_ID
+        sync: false
+      - key: HOCALWIRE_EMAIL
+        sync: false
+      - key: HOCALWIRE_PASSWORD
+        sync: false
+      - key: ENABLE_HOCALWIRE_UPLOAD
+        value: "true"
+      # ---- Pipeline Config ----
+      - key: ENABLE_IMAGE_GENERATION
+        value: "true"
+      - key: TRANSLATION_ENABLED
+        value: "true"
+      - key: MAX_ARTICLES_PER_RUN
+        value: "5"
+      - key: TOP_TRENDS_COUNT
+        value: "2"
+      - key: ARTICLE_MIN_WORDS
+        value: "800"
+      - key: SCRAPING_INTERVAL_HOURS
+        value: "3"
+      # ---- Python ----
+      - key: PYTHONUNBUFFERED
+        value: "1"

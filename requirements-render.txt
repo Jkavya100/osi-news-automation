@@ -1,0 +1,41 @@
+# OSI News Automation - Render.com Production Requirements
+# Stripped of local-only packages (torch, diffusers, playwright, social media SDKs)
+# that are not needed in cloud mode.
+
+# Web Scraping
+newspaper3k==0.2.8
+beautifulsoup4==4.12.2
+lxml==4.9.3
+requests==2.31.0
+
+# NLP / Embeddings (needed for duplicate detection)
+sentence-transformers==2.2.2
+
+# LLM
+groq==1.0.0
+
+# Image - placeholder fallback only (FLUX.1 via HF API, no local GPU needed)
+pillow==10.1.0
+
+# Database
+pymongo==4.6.1
+
+# Translation
+deep-translator==1.11.4
+
+# Scheduling
+APScheduler==3.10.4
+
+# Cloudinary - image hosting
+cloudinary==1.36.0
+
+# Utilities
+python-dotenv==1.0.0
+pyyaml==6.0.1
+python-dateutil==2.8.2
+pytz==2023.3
+validators==0.22.0
+loguru==0.7.2
+
+# feedparser for RSS scraping
+feedparser==6.0.10
