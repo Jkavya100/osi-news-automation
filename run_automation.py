@@ -20,6 +20,7 @@ Usage:
 
 import sys
 import os
+import subprocess
 import argparse
 import json
 import traceback
@@ -28,6 +29,33 @@ from pathlib import Path
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
+
+# -------------------------------------------------------
+# Ensure all critical dependencies are installed BEFORE
+# importing any src.* modules. This fixes GitHub Actions
+# runner environments where some packages may be missing.
+# -------------------------------------------------------
+def ensure_dependencies():
+    """Install missing packages before any src imports."""
+    required = {
+        "langdetect": "langdetect==1.0.9",
+        "feedparser": "feedparser==6.0.10",
+        "cloudinary": "cloudinary==1.36.0",
+    }
+    missing = []
+    for module, pip_name in required.items():
+        try:
+            __import__(module)
+        except ImportError:
+            missing.append(pip_name)
+    if missing:
+        print(f"[bootstrap] Installing missing packages: {missing}")
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--quiet"] + missing
+        )
+
+ensure_dependencies()
+# -------------------------------------------------------
 
 from loguru import logger
 from dotenv import load_dotenv

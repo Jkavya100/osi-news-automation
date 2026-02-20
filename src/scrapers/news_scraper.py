@@ -6,7 +6,7 @@ Extracts structured article data with error handling.
 """
 
 from newspaper import Article, Config
-
+from langdetect import detect, LangDetectException
 from datetime import datetime
 from loguru import logger
 from typing import Dict, Optional, List
@@ -321,12 +321,12 @@ def scrape_single_article(url: str, source_name: str = "") -> Optional[Dict]:
         metadata = article.meta_data if hasattr(article, 'meta_data') else {}
         location = extract_location(raw_text, metadata)
         
-        # Detect language (simple inline — avoids langdetect dependency)
+        # Detect language
         try:
-            sample = story[:200] if story else ""
-            non_ascii = sum(1 for c in sample if ord(c) > 127)
-            ratio = non_ascii / max(len(sample), 1)
-            language = 'en' if ratio < 0.15 else 'und'
+            sample_text = story[:500] if len(story) > 500 else story
+            language = detect(sample_text)
+        except LangDetectException:
+            language = 'en'
         except Exception:
             language = 'en'
         
