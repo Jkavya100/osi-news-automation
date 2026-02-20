@@ -6,7 +6,12 @@ Extracts structured article data with error handling.
 """
 
 from newspaper import Article, Config
-from langdetect import detect, LangDetectException
+try:
+    from langdetect import detect, LangDetectException
+except ImportError:
+    import subprocess, sys
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "langdetect==1.0.9"])
+    from langdetect import detect, LangDetectException
 from datetime import datetime
 from loguru import logger
 from typing import Dict, Optional, List
