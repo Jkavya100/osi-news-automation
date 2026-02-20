@@ -1,0 +1,68 @@
+name: OSI News Automation - Run Every 3 Hours
+
+on:
+  schedule:
+    - cron: "0 */3 * * *"   # every 3 hours UTC (00:00, 03:00, 06:00 ...)
+  workflow_dispatch:          # allow manual trigger from GitHub UI
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30       # safety cutoff
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: requirements-render.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-render.txt
+
+      - name: Run automation pipeline
+        env:
+          # MongoDB Atlas
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          MONGO_DB_NAME: osi_news_automation
+
+          # Groq LLM
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: llama-3.3-70b-versatile
+
+          # HuggingFace (FLUX.1-schnell)
+          HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+
+          # Cloudinary (image hosting)
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+
+          # Hocalwire CMS
+          HOCALWIRE_API_URL: https://democracynewslive.com/dev/h-api/createFeedV2
+          HOCALWIRE_API_KEY: ${{ secrets.HOCALWIRE_API_KEY }}
+          HOCALWIRE_USER_SESSION_ID: ${{ secrets.HOCALWIRE_USER_SESSION_ID }}
+          HOCALWIRE_EMAIL: ${{ secrets.HOCALWIRE_EMAIL }}
+          HOCALWIRE_PASSWORD: ${{ secrets.HOCALWIRE_PASSWORD }}
+          ENABLE_HOCALWIRE_UPLOAD: "true"
+
+          # Pipeline config
+          ENABLE_IMAGE_GENERATION: "true"
+          TRANSLATION_ENABLED: "true"
+          ENABLE_TREND_DETECTION: "true"
+          ENABLE_ARTICLE_GENERATION: "true"
+          MAX_ARTICLES_PER_RUN: "5"
+          TOP_TRENDS_COUNT: "2"
+          ARTICLE_MIN_WORDS: "800"
+          ARTICLE_MAX_WORDS: "1200"
+          SCRAPING_INTERVAL_HOURS: "3"
+          IMAGE_WIDTH: "1024"
+          IMAGE_HEIGHT: "768"
+          DUPLICATE_SIMILARITY_THRESHOLD: "0.85"
+          LOG_LEVEL: INFO
+
+        run: python run_automation.py --mode once
