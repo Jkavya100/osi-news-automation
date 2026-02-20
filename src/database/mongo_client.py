@@ -8,7 +8,6 @@ Supports both local MongoDB and MongoDB Atlas.
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from pymongo.errors import ConnectionFailure, DuplicateKeyError, ServerSelectionTimeoutError
 from datetime import datetime, timedelta
-from sentence_transformers import SentenceTransformer
 from loguru import logger
 from bson import ObjectId
 import os
