@@ -3,6 +3,12 @@ OSI News Automation System - Hocalwire Uploader
 ================================================
 Uploads generated articles to Hocalwire CMS via their API.
 Handles authentication, geocoding, image URLs, and batch uploads.
+
+API Reference:
+  - Base URL: https://democracynewslive.com/dev/h-api/
+  - Auth: 's-id' header with API key
+  - Login: POST /login?email=...&password=...
+  - Create Feed: POST /createFeedV2
 """
 
 import os
@@ -32,6 +38,9 @@ except ImportError:
     logger.warning("Location extractor not available, will use default location detection")
     LOCATION_EXTRACTOR_AVAILABLE = False
 
+# Cache for the authenticated session token
+_hocalwire_session_token: Optional[str] = None
+
 
 # ===========================================
 # CONFIGURATION
@@ -47,6 +56,89 @@ def get_api_credentials() -> Tuple[Optional[str], Optional[str]]:
     api_url = os.getenv('HOCALWIRE_API_URL')
     api_key = os.getenv('HOCALWIRE_API_KEY')
     return api_url, api_key
+
+
+def get_login_base_url() -> str:
+    """Derive the base URL for login from the API URL."""
+    api_url = os.getenv('HOCALWIRE_API_URL', '')
+    # Strip the endpoint to get base, e.g. https://democracynewslive.com/dev/h-api/
+    if '/createFeedV2' in api_url:
+        return api_url.replace('/createFeedV2', '')
+    if '/createfeedv2' in api_url.lower():
+        return api_url[:api_url.lower().rfind('/createfeedv2')]
+    return api_url.rstrip('/')
+
+
+def login_to_hocalwire() -> Optional[str]:
+    """
+    Log in to Hocalwire using email/password credentials and return a session token.
+
+    The Hocalwire API uses an 's-id' header for authentication, and a user session ID
+    is required for article submission. This function:
+    1. Uses the static session ID from .env if set
+    2. Attempts login if HOCALWIRE_EMAIL and HOCALWIRE_PASSWORD are configured
+
+    Returns:
+        Session token/ID string, or None if login failed.
+    """
+    global _hocalwire_session_token
+
+    # Return cached token if available
+    if _hocalwire_session_token:
+        return _hocalwire_session_token
+
+    # Use static session ID from env first
+    static_session_id = os.getenv('HOCALWIRE_USER_SESSION_ID', '').strip()
+    if static_session_id:
+        logger.info(f"Using static Hocalwire session ID from .env")
+        _hocalwire_session_token = static_session_id
+        return _hocalwire_session_token
+
+    # Try dynamic login if credentials are available
+    email = os.getenv('HOCALWIRE_EMAIL', '').strip()
+    password = os.getenv('HOCALWIRE_PASSWORD', '').strip()
+    api_key = os.getenv('HOCALWIRE_API_KEY', '').strip()
+
+    if not email or not password:
+        logger.warning("No HOCALWIRE_USER_SESSION_ID or HOCALWIRE_EMAIL/PASSWORD set. Using empty session.")
+        return None
+
+    base_url = get_login_base_url()
+    login_url = f"{base_url}/login"
+
+    try:
+        logger.info(f"Logging into Hocalwire at {login_url}...")
+        response = requests.post(
+            login_url,
+            params={'email': email, 'password': password},
+            headers={'accept': '*/*', 's-id': api_key},
+            timeout=30
+        )
+        response.raise_for_status()
+        result = response.json()
+
+        # Extract session token from response
+        token = (
+            result.get('sessionId') or
+            result.get('session_id') or
+            result.get('token') or
+            result.get('data', {}).get('sessionId') if isinstance(result.get('data'), dict) else None
+        )
+
+        if token:
+            logger.success(f"Logged in to Hocalwire successfully")
+            _hocalwire_session_token = token
+            return token
+        else:
+            logger.warning(f"Login succeeded but no session token in response: {result}")
+            return None
+
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"Hocalwire login HTTP error: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Hocalwire login failed: {e}")
+        return None
 
 
 # ===========================================
@@ -339,13 +431,12 @@ def upload_to_hocalwire(
     if not image_url:
         image_url = "https://www.hocalwire.com/images/logo.png"  # Fallback
     
-    # Build payload in Hocalwire's required format (from Swagger docs)
-    # Using user's session ID from registration: RDWEBC66OSW3CAJX JA2RSL7Y7OKWUA5IJMQ9C
-    user_session_id = os.getenv('HOCALWIRE_USER_SESSION_ID', 'RDWEBC66OSW3CAJXJA2RSL7Y7OKWUA5IJMQ9C')
-    
+    # Get user session ID (from login or static .env value)
+    user_session_id = login_to_hocalwire() or os.getenv('HOCALWIRE_USER_SESSION_ID', '')
+
     # Get current date/time for published date
     published_date = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.000Z')
-    
+
     payload = {
         "heading": heading,
         "mediaIds": image_url,
@@ -356,7 +447,7 @@ def upload_to_hocalwire(
         "point_long": lon,
         "point_lat": lat,
         "language": article.get('language', 'en'),
-        "sessionId": user_session_id,  # User's session ID from registration
+        "sessionId": user_session_id,  # User's session ID from login/registration
         "news_type": os.getenv('HOCALWIRE_NEWS_TYPE', 'CITIZEN_FEED'),
         "publishedDate": published_date  # Add publish date to fix "Date: null" issue
     }
