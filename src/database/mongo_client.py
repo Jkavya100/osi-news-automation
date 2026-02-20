@@ -129,8 +129,8 @@ class MongoDBClient:
             # Retry queue index
             self.articles.create_index([("upload_status", ASCENDING), ("upload_last_retry", ASCENDING)])
             
-            # Trends indexes
-            self.trends.create_index([("topic", ASCENDING)])
+            # Trends indexes — topic is unique (match existing DB index)
+            self.trends.create_index([("topic", ASCENDING)], unique=True)
             self.trends.create_index([("last_seen", DESCENDING)])
             
             # Sessions indexes
@@ -209,6 +209,12 @@ class MongoDBClient:
                 "upload_last_retry": article_dict.get("upload_last_retry", None),
                 "upload_failure_reason": article_dict.get("upload_failure_reason", None)
             }
+
+            # MongoDB uses the `language` field as a text-index language specifier.
+            # Values like 'hi' (Hindi) and 'ar' (Arabic) are not supported and cause
+            # error 17262. Rename it to `content_language` before saving.
+            if "language" in article:
+                article["content_language"] = article.pop("language")
 
             # Only include hocalwire_feed_id if it has a real value (schema requires string, not null)
             if article_dict.get("hocalwire_feed_id"):
@@ -337,6 +343,9 @@ class MongoDBClient:
                     "upload_last_retry": article.get("upload_last_retry", None),
                     "upload_failure_reason": article.get("upload_failure_reason", None)
                 }
+                # Rename `language` to avoid MongoDB text-index language override error 17262
+                if "language" in prepared:
+                    prepared["content_language"] = prepared.pop("language")
                 
                 # Generate embedding if story exists
                 if "story" in prepared and prepared["story"]:
