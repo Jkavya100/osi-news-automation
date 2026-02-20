@@ -7,6 +7,8 @@ newspaper3k==0.2.8
 beautifulsoup4==4.12.2
 lxml==4.9.3
 requests==2.31.0
+langdetect==1.0.9
+feedparser==6.0.10
 
 # NLP / Embeddings (needed for duplicate detection)
 sentence-transformers==2.2.2
@@ -36,6 +38,3 @@ python-dateutil==2.8.2
 pytz==2023.3
 validators==0.22.0
 loguru==0.7.2
-
-# feedparser for RSS scraping
-feedparser==6.0.10
