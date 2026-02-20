@@ -482,24 +482,44 @@ def upload_to_hocalwire(
         result = response.json()
         
         if result.get('status') == 'success' or result.get('feedId'):
-            feed_id = result.get('feedId', 'unknown')
+            feed_id = str(result.get('feedId', 'unknown'))
             logger.success(f"✅ Uploaded successfully - Feed ID: {feed_id}")
-            
-            # Update article with upload info
+
+            # Update article dict with upload info
             article['hocalwire_feed_id'] = feed_id
             article['upload_status'] = 'uploaded'
             article['uploaded_at'] = datetime.utcnow().isoformat()
-            
-            # Update in database if article has an _id
-            if '_id' in article:
+
+            # Update in database — try by _id first, then by heading
+            try:
                 from src.database.mongo_client import get_client
                 db = get_client()
-                db.update_upload_status(
-                    article['_id'],
-                    'uploaded',
-                    hocalwire_feed_id=feed_id
-                )
-            
+                updated = False
+
+                if article.get('_id'):
+                    updated = db.update_upload_status(
+                        article['_id'],
+                        'uploaded',
+                        hocalwire_feed_id=feed_id
+                    )
+
+                if not updated:
+                    # Fallback: update by heading match (for articles whose save returned None)
+                    heading = article.get('heading', '')
+                    if heading and db._ensure_connected():
+                        db.articles.update_one(
+                            {'heading': heading, 'upload_status': {'$ne': 'uploaded'}},
+                            {'$set': {
+                                'upload_status': 'uploaded',
+                                'hocalwire_feed_id': feed_id,
+                                'uploaded_at': datetime.utcnow()
+                            }}
+                        )
+                        logger.debug(f"Updated DB by heading fallback for: {heading[:50]}")
+
+            except Exception as db_err:
+                logger.warning(f"DB status update failed (upload still succeeded): {db_err}")
+
             return True
         else:
             error_msg = result.get('message', str(result))
