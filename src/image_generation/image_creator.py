@@ -31,7 +31,7 @@ load_dotenv()
 # CONFIGURATION
 # ===========================================
 
-HF_API_URL = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-3.5-large/v1/images/generations"
+HF_API_URL = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-3.5-large"
 HF_MODEL_NAME = "stabilityai/stable-diffusion-3.5-large"
 
 
@@ -269,24 +269,24 @@ def generate_with_huggingface(
         "Content-Type": "application/json",
     }
 
-    # The router uses the OpenAI images/generations format
-    full_prompt = prompt
-    if negative_prompt:
-        full_prompt += f" | negative: {negative_prompt[:200]}"
-
+    # HF image models use the `inputs` format (same API as the old inference endpoint)
     payload = {
-        "prompt": full_prompt,
-        "model": HF_MODEL_NAME,
-        "width": width,
-        "height": height,
-        "num_inference_steps": num_inference_steps,
-        "guidance_scale": guidance_scale,
-        "n": 1,
-        "response_format": "b64_json",
+        "inputs": prompt,
+        "parameters": {
+            "negative_prompt": negative_prompt,
+            "width": width,
+            "height": height,
+            "num_inference_steps": num_inference_steps,
+            "guidance_scale": guidance_scale,
+        },
+        "options": {
+            "wait_for_model": True,
+            "use_cache": False,
+        }
     }
 
     try:
-        logger.info(f"🖼️  Calling HuggingFace SD 3.5 Large via router ({width}x{height}, steps={num_inference_steps})...")
+        logger.info(f"\U0001f5bc\ufe0f  Calling HuggingFace SD 3.5 Large via router ({width}x{height}, steps={num_inference_steps})...")
 
         response = requests.post(
             HF_API_URL,
@@ -302,21 +302,18 @@ def generate_with_huggingface(
 
         response.raise_for_status()
 
-        # Router returns OpenAI-style JSON: {"data": [{"b64_json": "..."}]}
-        result = response.json()
-        b64 = result.get("data", [{}])[0].get("b64_json")
-        if b64:
-            image_bytes = base64.b64decode(b64)
-            logger.success(f"✅ HuggingFace SD 3.5 image generated ({len(image_bytes) / 1024:.1f} KB)")
-            return image_bytes
-
-        # Fallback: maybe it returned raw bytes (old endpoint style)
+        # Image models return raw PNG/JPEG bytes
         content_type = response.headers.get("Content-Type", "")
-        if "image" in content_type:
-            logger.success(f"✅ HuggingFace SD 3.5 image generated (raw bytes, {len(response.content) / 1024:.1f} KB)")
+        if "image" in content_type or len(response.content) > 1000:
+            logger.success(f"\u2705 HuggingFace SD 3.5 image generated ({len(response.content) / 1024:.1f} KB)")
             return response.content
 
-        logger.error(f"HuggingFace returned unexpected response: {str(result)[:200]}")
+        # Attempt JSON parse for error detail
+        try:
+            err = response.json()
+            logger.error(f"HuggingFace returned JSON instead of image: {err}")
+        except Exception:
+            logger.error(f"Unexpected HuggingFace response ({len(response.content)} bytes): {response.text[:200]}")
         return None
 
     except requests.exceptions.Timeout:
