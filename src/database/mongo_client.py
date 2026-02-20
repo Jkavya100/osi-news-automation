@@ -230,7 +230,9 @@ class MongoDBClient:
             
             # Generate embedding for duplicate detection if story exists
             if "story" in article and article["story"]:
-                article["embedding"] = self._get_embedding(article["story"])
+                emb = self._get_embedding(article["story"])
+                if emb is not None:
+                    article["embedding"] = emb
             
             result = self.articles.insert_one(article)
             article_id = str(result.inserted_id)
@@ -487,23 +489,22 @@ class MongoDBClient:
     # DUPLICATE DETECTION
     # ===========================================
     
-    def _get_embedding(self, text: str) -> List[float]:
+    def _get_embedding(self, text: str) -> Optional[List[float]]:
         """
         Generate embedding for text, with caching.
-        
-        Args:
-            text: Text to embed.
-            
-        Returns:
-            list: Embedding vector.
+        Returns None if sentence-transformers is not installed.
         """
+        model = self.embedding_model
+        if model is None:
+            return None
+        
         # Use hash of first 500 chars as cache key
         cache_key = str(hash(text[:500]))
         
         if cache_key in self._embedding_cache:
             return self._embedding_cache[cache_key]
         
-        embedding = self.embedding_model.encode(text).tolist()
+        embedding = model.encode(text).tolist()
         
         # Limit cache size
         if len(self._embedding_cache) > 1000:
