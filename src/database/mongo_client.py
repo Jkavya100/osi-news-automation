@@ -90,12 +90,15 @@ class MongoDBClient:
             logger.info(f"Connecting to MongoDB at {self.uri[:30]}...")
             
             # Create client with connection pooling
+            import certifi
             self.client = MongoClient(
                 self.uri,
-                serverSelectionTimeoutMS=10000,  # 10 second timeout
-                connectTimeoutMS=10000,
+                serverSelectionTimeoutMS=20000,  # 20 second timeout
+                connectTimeoutMS=20000,
                 maxPoolSize=50,
-                retryWrites=True
+                retryWrites=True,
+                tls=True,
+                tlsCAFile=certifi.where(),
             )
             
             # Test connection
