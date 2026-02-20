@@ -148,6 +148,24 @@ class MongoDBClient:
             self._connected = False
             logger.info("Disconnected from MongoDB")
     
+    def _coerce_datetime(self, value) -> datetime:
+        """
+        Coerce a value to a datetime object.
+
+        MongoDB's $jsonSchema 'bsonType: date' requires an actual datetime,
+        not an ISO string. Translators and generators sometimes store
+        dates as isoformat() strings — this corrects that.
+        """
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            try:
+                # Handle both '2026-02-20T10:26:17.765387' and '2026-02-20T10:26:17Z'
+                return datetime.fromisoformat(value.replace('Z', '+00:00').replace('+00:00', ''))
+            except ValueError:
+                pass
+        return datetime.utcnow()
+
     def _ensure_connected(self) -> bool:
         """Ensure database is connected, attempt reconnection if needed."""
         if not self._connected or self.client is None:
@@ -183,7 +201,8 @@ class MongoDBClient:
             # Add metadata with retry tracking fields
             article = {
                 **article_dict,
-                "scraped_at": article_dict.get("scraped_at", datetime.utcnow()),
+                # Ensure scraped_at is always a BSON date, never an ISO string
+                "scraped_at": self._coerce_datetime(article_dict.get("scraped_at", datetime.utcnow())),
                 "upload_status": article_dict.get("upload_status", "pending"),
                 # Retry tracking fields
                 "upload_retry_count": article_dict.get("upload_retry_count", 0),
@@ -310,7 +329,8 @@ class MongoDBClient:
             for article in articles_list:
                 prepared = {
                     **article,
-                    "scraped_at": article.get("scraped_at", datetime.utcnow()),
+                    # Ensure scraped_at is always a BSON date, never an ISO string
+                    "scraped_at": self._coerce_datetime(article.get("scraped_at", datetime.utcnow())),
                     "upload_status": article.get("upload_status", "pending"),
                     # Retry tracking fields
                     "upload_retry_count": article.get("upload_retry_count", 0),
