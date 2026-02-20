@@ -185,12 +185,15 @@ class MongoDBClient:
                 **article_dict,
                 "scraped_at": article_dict.get("scraped_at", datetime.utcnow()),
                 "upload_status": article_dict.get("upload_status", "pending"),
-                "hocalwire_feed_id": article_dict.get("hocalwire_feed_id", None),
                 # Retry tracking fields
                 "upload_retry_count": article_dict.get("upload_retry_count", 0),
                 "upload_last_retry": article_dict.get("upload_last_retry", None),
                 "upload_failure_reason": article_dict.get("upload_failure_reason", None)
             }
+
+            # Only include hocalwire_feed_id if it has a real value (schema requires string, not null)
+            if article_dict.get("hocalwire_feed_id"):
+                article["hocalwire_feed_id"] = article_dict["hocalwire_feed_id"]
             
             # Generate embedding for duplicate detection if story exists
             if "story" in article and article["story"]:
