@@ -189,16 +189,17 @@ def run_pipeline(dry_run: bool = False) -> dict:
         logger.info("=" * 80)
         
         top_n_trends = int(os.getenv('TOP_TRENDS_COUNT', 5))
-        trends = detect_trends(articles, top_n=top_n_trends)
         
-        if not trends:
-            logger.warning("⚠️ No trends detected. Using all articles as one trend.")
-            trends = [{
-                'topic': 'Global News',
-                'articles': articles,
-                'article_count': len(articles),
+        # Each scraped article becomes its own focused trend (no mixing)
+        # This ensures each generated article covers ONE topic only.
+        trends = []
+        for article in articles[:top_n_trends]:
+            trends.append({
+                'topic': article.get('heading', 'News Update'),
+                'articles': [article],
+                'article_count': 1,
                 'keywords': []
-            }]
+            })
         
         stats['trends_detected'] = len(trends)
         logger.info(f"✅ Detected {len(trends)} trends:")
