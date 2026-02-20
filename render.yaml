@@ -8,7 +8,6 @@ services:
     schedule: "0 */3 * * *"       # every 3 hours (UTC)
     buildCommand: pip install -r requirements-render.txt
     startCommand: python run_automation.py --mode once
-    plan: free
     envVars:
       # ---- Groq LLM ----
       - key: GROQ_API_KEY
