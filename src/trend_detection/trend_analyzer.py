@@ -5,9 +5,15 @@ Analyzes scraped articles to identify trending topics using NLP.
 Uses sentence embeddings and clustering to group similar articles.
 """
 
-from sentence_transformers import SentenceTransformer
-from sklearn.cluster import AgglomerativeClustering
-from sklearn.metrics.pairwise import cosine_similarity
+try:
+    from sentence_transformers import SentenceTransformer
+    from sklearn.cluster import AgglomerativeClustering
+    from sklearn.metrics.pairwise import cosine_similarity
+    _HAS_EMBEDDINGS = True
+except ImportError:
+    _HAS_EMBEDDINGS = False
+    SentenceTransformer = None
+
 import numpy as np
 from typing import List, Dict, Optional, Tuple
 from loguru import logger
@@ -25,22 +31,41 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 # MODEL LOADING (Lazy initialization)
 # ===========================================
 
-_model: Optional[SentenceTransformer] = None
+_model = None
 
 
-def get_model() -> SentenceTransformer:
+def get_model():
     """
     Get or initialize the sentence transformer model.
     Uses lazy loading to avoid startup delay.
+    Returns None if sentence-transformers is not installed.
     """
     global _model
-    
+
+    if not _HAS_EMBEDDINGS:
+        return None
+
     if _model is None:
         logger.info("Loading sentence transformer model...")
         _model = SentenceTransformer('all-MiniLM-L6-v2')
         logger.info("Model loaded successfully")
-    
+
     return _model
+
+
+# ===========================================
+# KEYWORD-BASED SIMILARITY FALLBACK
+# ===========================================
+
+def _keyword_similarity(text_a: str, text_b: str) -> float:
+    """Simple keyword overlap similarity (Jaccard) as fallback."""
+    words_a = set(re.findall(r'\b[a-zA-Z]{3,}\b', text_a.lower())) - STOP_WORDS
+    words_b = set(re.findall(r'\b[a-zA-Z]{3,}\b', text_b.lower())) - STOP_WORDS
+    if not words_a or not words_b:
+        return 0.0
+    intersection = words_a & words_b
+    union = words_a | words_b
+    return len(intersection) / len(union)
 
 
 # ===========================================
@@ -223,31 +248,51 @@ def detect_trends(
         valid_headlines = [headlines[i] for i in valid_indices]
         valid_articles = [articles[i] for i in valid_indices]
         
-        # Generate embeddings
+        # Generate similarity matrix (embeddings or keyword fallback)
         model = get_model()
-        logger.debug("Generating embeddings...")
-        embeddings = model.encode(valid_headlines, show_progress_bar=False)
-        
-        # Calculate similarity matrix
-        similarity_matrix = cosine_similarity(embeddings)
+        if model is not None:
+            logger.debug("Generating embeddings...")
+            embeddings = model.encode(valid_headlines, show_progress_bar=False)
+            similarity_matrix = cosine_similarity(embeddings)
+        else:
+            logger.info("Using keyword-based similarity (sentence-transformers not available)")
+            n = len(valid_headlines)
+            similarity_matrix = np.zeros((n, n))
+            for i in range(n):
+                for j in range(i, n):
+                    sim = _keyword_similarity(valid_headlines[i], valid_headlines[j])
+                    similarity_matrix[i][j] = sim
+                    similarity_matrix[j][i] = sim
+                similarity_matrix[i][i] = 1.0
         
         # Convert to distance matrix for clustering
         distance_matrix = 1 - similarity_matrix
         np.fill_diagonal(distance_matrix, 0)  # Ensure diagonal is 0
         
-        # Determine number of clusters
-        # Adaptive: more articles = more potential clusters
-        n_clusters = max(2, min(top_n * 3, len(valid_articles) // 2))
-        
-        logger.debug(f"Clustering into {n_clusters} groups...")
-        
         # Perform clustering
-        clustering = AgglomerativeClustering(
-            n_clusters=n_clusters,
-            metric='precomputed',
-            linkage='average'
-        )
-        labels = clustering.fit_predict(distance_matrix)
+        if _HAS_EMBEDDINGS:
+            # Scikit-learn AgglomerativeClustering
+            n_clusters = max(2, min(top_n * 3, len(valid_articles) // 2))
+            logger.debug(f"Clustering into {n_clusters} groups...")
+            clustering = AgglomerativeClustering(
+                n_clusters=n_clusters,
+                metric='precomputed',
+                linkage='average'
+            )
+            labels = clustering.fit_predict(distance_matrix)
+        else:
+            # Simple greedy clustering fallback
+            logger.debug("Using greedy clustering fallback...")
+            labels = [-1] * len(valid_articles)
+            cluster_id = 0
+            for i in range(len(valid_articles)):
+                if labels[i] != -1:
+                    continue
+                labels[i] = cluster_id
+                for j in range(i + 1, len(valid_articles)):
+                    if labels[j] == -1 and similarity_matrix[i][j] >= similarity_threshold:
+                        labels[j] = cluster_id
+                cluster_id += 1
         
         # Group articles by cluster
         clusters: Dict[int, List[int]] = {}

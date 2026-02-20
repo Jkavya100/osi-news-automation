@@ -1,16 +1,16 @@
 # OSI News Automation - Render.com Production Requirements
 # Stripped of local-only packages (torch, diffusers, playwright, social media SDKs)
 # that are not needed in cloud mode.
-
 # Web Scraping
 newspaper3k==0.2.8
 beautifulsoup4==4.12.2
 lxml==4.9.3
 requests==2.31.0
 feedparser==6.0.10
+langdetect==1.0.9
 
-# NLP / Embeddings (needed for duplicate detection)
-sentence-transformers==2.2.2
+# Lightweight NLP (trend detection uses keyword fallback, no torch/CUDA needed)
+numpy>=1.24.0
 
 # LLM
 groq==1.0.0
