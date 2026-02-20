@@ -120,113 +120,227 @@ def detect_category(heading: str, story: str = "") -> str:
 
 def build_image_prompt(article: Dict) -> str:
     """
-    Create an SD 3.5-optimised prompt from article content.
+    Build a photojournalism-quality prompt for FLUX.1-schnell.
 
-    Args:
-        article: Article dictionary with heading, story, location/dateline.
-    Returns:
-        Optimized prompt string.
+    Leads with 'A Reuters/AP news photograph of...' to force photorealism.
+    Covers 15+ news categories including religion, Palestine, protests, royals.
     """
     heading = article.get('heading', 'News Event')
     story = article.get('story', '')
-    topic = article.get('topic', heading)
     location = article.get('location', article.get('dateline', ''))
 
-    content = (heading + " " + story[:500]).lower()
+    content = (heading + " " + story[:600]).lower()
 
-    # Extract location context
-    location_context = ""
-    if location:
-        location_clean = location.replace("*", "").strip().title()
-        location_visuals = {
-            'dubai': 'Dubai skyline, modern architecture',
-            'india': 'India, Indian flag colors',
-            'bangladesh': 'Bangladesh, green and red colors',
-            'london': 'London landmarks',
-            'paris': 'Paris landmarks',
-            'new york': 'New York cityscape',
-            'washington': 'Washington DC government buildings',
-        }
-        for city, visual in location_visuals.items():
-            if city in location.lower():
-                location_context = f"in {visual}, "
-                break
-        if not location_context and location_clean:
-            location_context = f"in {location_clean}, "
+    # -------------------------------------------------------
+    # LOCATION → specific visual scene description
+    # -------------------------------------------------------
+    loc_scene = ""
+    location_map = {
+        'palestine': 'in Jerusalem, Palestine, Arabic architecture, stone buildings',
+        'gaza': 'in Gaza, Palestinians in street, concrete buildings',
+        'israel': 'in Jerusalem, Israel, old city walls, stone buildings',
+        'jerusalem': 'in Jerusalem old city, stone walls, religious buildings',
+        'west bank': 'in the West Bank, Palestinian town, Israeli checkpoint',
+        'india': 'in India, colorful street scene, Indian flag visible',
+        'pakistan': 'in Pakistan, Pakistani city street',
+        'bangladesh': 'in Dhaka Bangladesh, green and red flag visible',
+        'ukraine': 'in Ukraine, war-damaged buildings, Ukrainian flag',
+        'russia': 'in Moscow Russia, Red Square architecture',
+        'china': 'in Beijing China, Chinese architecture',
+        'iran': 'in Tehran Iran, Islamic architecture, Persian city',
+        'afghanistan': 'in Kabul Afghanistan, mountainous skyline',
+        'dubai': 'in Dubai, glass skyscrapers, modern Arabian architecture',
+        'london': 'in London UK, Big Ben or Parliament in background',
+        'paris': 'in Paris France, Eiffel Tower visible',
+        'washington': 'in Washington DC, Capitol building or White House',
+        'new york': 'in New York City, Manhattan skyline',
+        'united states': 'in the United States, American street scene',
+        'europe': 'in Europe, European city architecture',
+        'middle east': 'in the Middle East, Islamic architecture, dusty streets',
+        'africa': 'in Africa, African cityscape or landscape',
+    }
+    loc_lower = (location + " " + content).lower()
+    for keyword, visual in location_map.items():
+        if keyword in loc_lower:
+            loc_scene = visual + ", "
+            break
+    if not loc_scene and location:
+        loc_clean = location.replace("*", "").strip()
+        if loc_clean:
+            loc_scene = f"in {loc_clean}, "
 
-    # Category-based prompt selection (priority order)
-    if any(w in content for w in ['cricket', 'icc', 't20', 'test match', 'odi', 'world cup',
-                                    'batsman', 'bowler', 'wicket', 'stadium', 'tournament']):
-        prompt = (f"professional sports photography of cricket match, cricket stadium with players, "
-                  f"{location_context}cricket action shot, international cricket tournament, "
-                  f"cricket ball and bat visible, sports journalism style, dynamic athletic composition")
+    # -------------------------------------------------------
+    # TOPIC DETECTION → specific photojournalism scene
+    # Priority: most specific first
+    # -------------------------------------------------------
 
-    elif any(w in content for w in ['football', 'soccer', 'match', 'championship',
-                                     'olympics', 'athlete', 'game', 'player', 'team']):
-        sport = 'cricket' if 'world cup' in content else 'football'
-        prompt = (f"dynamic {sport} sports photography, {location_context}professional sports journalism, "
-                  f"stadium atmosphere, athletic competition")
-
-    elif any(w in content for w in ['government', 'president', 'minister', 'parliament',
-                                     'election', 'politics', 'congress', 'senate']):
-        prompt = (f"government building or political setting, {location_context}"
-                  f"official government architecture, political press conference atmosphere, "
-                  f"professional political photography, formal institutional setting")
-
-    elif any(w in content for w in ['war', 'military', 'conflict', 'attack', 'strike',
-                                     'troops', 'defense', 'weapon']):
-        prompt = (f"news photograph showing conflict aftermath or military activity, {location_context}"
-                  f"serious journalistic documentation, photojournalism style, documentary photography")
-
-    elif any(w in content for w in ['economy', 'market', 'business', 'stock', 'finance',
-                                     'trade', 'investment', 'gdp', 'growth']):
-        prompt = (f"modern business and finance concept, {location_context}"
-                  f"stock market visualization, financial district skyline, professional business photography")
-
-    elif any(w in content for w in ['technology', 'tech', 'ai', 'digital', 'cyber',
-                                     'software', 'internet', 'computer', 'innovation']):
-        prompt = (f"modern technology and innovation concept, {location_context}"
-                  f"futuristic digital visualization, high-tech environment, professional tech photography")
-
-    elif any(w in content for w in ['health', 'medical', 'hospital', 'doctor', 'vaccine',
-                                     'disease', 'covid', 'pandemic', 'treatment']):
-        prompt = (f"professional medical and healthcare setting, {location_context}"
-                  f"healthcare concept, clinical environment, health and medicine visualization")
-
-    elif any(w in content for w in ['climate', 'environment', 'pollution', 'green',
-                                     'emission', 'renewable', 'sustainable']):
-        prompt = (f"environmental and climate concept photography, {location_context}"
-                  f"nature and sustainability visualization, documentary environmental photography")
-
-    elif any(w in content for w in ['storm', 'flood', 'earthquake', 'disaster',
-                                     'emergency', 'rescue', 'hurricane']):
-        prompt = (f"dramatic weather or natural disaster scene, {location_context}"
-                  f"emergency response, photojournalism style, impactful disaster documentation")
-
-    else:
-        category = detect_category(heading, story)
-        if category in CATEGORY_PROMPTS:
-            tmpl = CATEGORY_PROMPTS[category]['template']
-            prompt = tmpl.format(topic=topic[:150])
-            if location_context:
-                prompt = prompt.replace(', ', f', {location_context}', 1)
+    # RELIGION — mosque, prayers, Ramadan, pilgrimage
+    if any(w in content for w in ['mosque', 'ramadan', 'prayer', 'prayers', 'friday prayer',
+                                    'imam', 'mecca', 'pilgrim', 'hajj', 'eid', 'islamic',
+                                    'church', 'cathedral', 'temple', 'religious', 'worship',
+                                    'buddhist', 'hindu', 'sikh', 'jewish', 'synagogue']):
+        if any(w in content for w in ['mosque', 'ramadan', 'prayer', 'imam', 'mecca', 'hajj', 'eid', 'islamic', 'muslim']):
+            prompt = (f"A Reuters news photograph of Muslim worshippers gathered outside a mosque for Friday prayers, "
+                      f"{loc_scene}crowd of men in traditional Islamic dress, "
+                      f"ornate mosque architecture with minarets visible, serene atmosphere, "
+                      f"documentary photojournalism")
+        elif any(w in content for w in ['church', 'cathedral', 'christian']):
+            prompt = (f"A Reuters news photograph of people at a church or cathedral, "
+                      f"{loc_scene}religious gathering, stone architecture, "
+                      f"documentary photojournalism style")
         else:
-            prompt = (f"professional news photography illustrating: {heading[:100]}, {location_context}"
-                      f"editorial quality, photojournalism style, news publication imagery")
+            prompt = (f"A Reuters news photograph of a religious gathering at a place of worship, "
+                      f"{loc_scene}people in traditional religious dress, "
+                      f"documentary photojournalism")
 
-    # SD 3.5 quality suffix
-    prompt += (", high resolution, sharp focus, professional lighting, "
-               "photorealistic, 4K, editorial photography, news agency quality")
+    # PROTEST / DEMONSTRATION
+    elif any(w in content for w in ['protest', 'demonstration', 'rally', 'march', 'demonstrators',
+                                     'protesters', 'riot', 'clashes', 'crowd gathered', 'activists']):
+        prompt = (f"An AP news photograph of a large protest demonstration {loc_scene}"
+                  f"crowd of protesters holding signs and banners in street, "
+                  f"tense atmosphere, photojournalism style, wide angle shot, "
+                  f"documentary street photography")
 
-    logger.debug(f"Generated SD 3.5 prompt: {prompt[:150]}...")
+    # ARREST / CRIME / COURT
+    elif any(w in content for w in ['arrested', 'arrest', 'court', 'trial', 'convicted', 'charged',
+                                     'police', 'crime', 'criminal', 'detained', 'custody', 'prison',
+                                     'sentence', 'verdict']):
+        prompt = (f"A Reuters news photograph showing law enforcement activity {loc_scene}"
+                  f"police officers in uniform, courthouse exterior or police station, "
+                  f"serious news event, documentary journalism photography, "
+                  f"professional press photo")
+
+    # PALESTINE / ISRAEL / MIDDLE EAST CONFLICT
+    elif any(w in content for w in ['palestine', 'palestinian', 'gaza', 'west bank', 'hamas',
+                                     'israel', 'israeli', 'occupation', 'ceasefire', 'airstrike',
+                                     'refugee camp', 'settlement']):
+        prompt = (f"An AP documentary photograph {loc_scene}"
+                  f"Palestinian people in street, stone buildings, separation barrier visible, "
+                  f"humanitarian crisis scene, gritty photojournalism, "
+                  f"serious documentary news photography")
+
+    # ROYAL FAMILY / MONARCHY
+    elif any(w in content for w in ['royal', 'king', 'queen', 'prince', 'princess', 'monarch',
+                                     'palace', 'coronation', 'windsor', 'mountbatten', 'buckingham']):
+        prompt = (f"A Reuters news photograph of a royal or official state occasion {loc_scene}"
+                  f"formal government ceremony, elegant official setting, "
+                  f"guards in uniform, ornate architecture, "
+                  f"professional press photography, dignified composition")
+
+    # CRICKET / SPORTS
+    elif any(w in content for w in ['cricket', 'icc', 't20', 'test match', 'odi',
+                                     'batsman', 'bowler', 'wicket']):
+        prompt = (f"A Getty Images sports photograph of a cricket match {loc_scene}"
+                  f"batsman hitting ball in international cricket stadium, "
+                  f"packed crowd in stands, action shot, "
+                  f"professional sports photography, motion blur on ball")
+
+    elif any(w in content for w in ['football', 'soccer', 'championship', 'world cup',
+                                     'olympics', 'athlete', 'tournament', 'league']):
+        sport = 'football' if 'football' in content or 'soccer' in content else 'sport'
+        prompt = (f"A Getty Images sports photograph of a {sport} match {loc_scene}"
+                  f"athletes competing on the field, stadium crowd, "
+                  f"dynamic action shot, professional sports photography")
+
+    # MILITARY / WAR / CONFLICT (non-Palestine)
+    elif any(w in content for w in ['war', 'military', 'troops', 'soldier', 'army', 'navy',
+                                     'airstrike', 'bombing', 'drone', 'missile', 'combat',
+                                     'battalion', 'armed forces', 'defense']):
+        prompt = (f"A Reuters documentary photograph of military activity {loc_scene}"
+                  f"soldiers in military uniform and gear, military vehicles, "
+                  f"serious conflict journalism, photojournalism style, "
+                  f"dramatic natural lighting")
+
+    # POLITICS / GOVERNMENT / ELECTIONS
+    elif any(w in content for w in ['government', 'president', 'prime minister', 'minister',
+                                     'parliament', 'election', 'vote', 'senator', 'congress',
+                                     'summit', 'diplomatic', 'treaty', 'policy', 'legislation']):
+        prompt = (f"A Reuters press photograph of a political event or press conference {loc_scene}"
+                  f"officials at podium addressing media, flags in background, "
+                  f"formal government setting, "
+                  f"professional political photojournalism")
+
+    # ECONOMY / FINANCE / MARKETS
+    elif any(w in content for w in ['economy', 'market', 'stock market', 'recession', 'inflation',
+                                     'gdp', 'bank', 'trade', 'investment', 'finance', 'currency']):
+        prompt = (f"A Reuters business photograph {loc_scene}"
+                  f"stock exchange trading floor with traders and digital price boards, "
+                  f"financial district glass towers, "
+                  f"professional business journalism photography")
+
+    # TECHNOLOGY
+    elif any(w in content for w in ['artificial intelligence', 'ai', 'technology', 'cybersecurity',
+                                     'startup', 'silicon valley', 'robot', 'chip', 'smartphone']):
+        prompt = (f"A professional technology photograph {loc_scene}"
+                  f"scientists or engineers working with technology equipment, "
+                  f"clean modern research lab or tech office, "
+                  f"documentary science photography")
+
+    # HEALTH / MEDICAL
+    elif any(w in content for w in ['hospital', 'doctor', 'vaccine', 'disease', 'pandemic',
+                                     'health', 'medical', 'surgery', 'patient', 'treatment',
+                                     'epidemic', 'virus']):
+        prompt = (f"A Reuters health photograph {loc_scene}"
+                  f"doctors and nurses in hospital treating patients, "
+                  f"medical equipment visible, white clinical environment, "
+                  f"documentary medical photography")
+
+    # ENVIRONMENT / CLIMATE
+    elif any(w in content for w in ['climate', 'global warming', 'flood', 'wildfire', 'drought',
+                                     'pollution', 'renewable', 'solar', 'carbon', 'deforestation']):
+        prompt = (f"A documentary environmental photograph {loc_scene}"
+                  f"striking natural landscape showing climate or environmental impact, "
+                  f"dramatic sky, powerful nature photography, "
+                  f"National Geographic style")
+
+    # DISASTER / EMERGENCY
+    elif any(w in content for w in ['earthquake', 'hurricane', 'tsunami', 'disaster', 'explosion',
+                                     'fire', 'rescue', 'emergency', 'evacuation', 'casualties']):
+        prompt = (f"An AP emergency and disaster news photograph {loc_scene}"
+                  f"rescue workers and emergency responders at disaster site, "
+                  f"dramatic scene, photojournalism documentation, "
+                  f"gritty realistic documentary photography")
+
+    # IMMIGRATION / REFUGEES
+    elif any(w in content for w in ['refugee', 'migrant', 'immigration', 'asylum', 'border',
+                                     'displaced', 'humanitarian', 'camp']):
+        prompt = (f"A UNHCR documentary photograph {loc_scene}"
+                  f"refugees or migrants at border crossing or humanitarian camp, "
+                  f"tents and temporary shelters visible, "
+                  f"powerful humanitarian photojournalism")
+
+    # FALLBACK — derive from heading directly
+    else:
+        # Use the article heading as direct scene description
+        clean_heading = heading[:120].strip()
+        prompt = (f"A Reuters news photograph illustrating: {clean_heading}, "
+                  f"{loc_scene}"
+                  f"documentary photojournalism style, real-world scene")
+
+    # -------------------------------------------------------
+    # FLUX.1 photorealism suffix
+    # -------------------------------------------------------
+    prompt += (
+        ", Canon EOS 5D Mark IV DSLR photograph, 35mm lens, "
+        "natural available lighting, photorealistic, "
+        "ultra-detailed, sharp focus, news agency quality"
+    )
+
+    logger.debug(f"Prompt: {prompt[:160]}...")
     return prompt
 
 
 def build_negative_prompt() -> str:
-    """Negative prompt to steer away from common artifacts."""
-    return ("text, watermark, signature, logo, blurry, low quality, "
-            "distorted, deformed, ugly, bad anatomy, cartoon, anime, "
-            "illustration, painting, sketch, oversaturated, underexposed")
+    """Strong negative prompt to prevent AI-looking, CGI, or generic imagery."""
+    return (
+        "CGI, 3D render, digital art, illustration, painting, cartoon, anime, "
+        "sketch, watercolor, unrealistic, artificial lighting, studio lighting, "
+        "text, watermark, signature, logo, "
+        "blurry, low quality, overexposed, underexposed, "
+        "distorted, deformed, ugly, duplicate, "
+        "generic office building, glass skyscraper, corporate stock photo, "
+        "futuristic, fantasy, sci-fi"
+    )
 
 
 # ===========================================
