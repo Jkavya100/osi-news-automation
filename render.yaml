@@ -1,12 +1,13 @@
 services:
-  # Background Worker: runs the scheduled pipeline every 3 hours
-  - type: worker
+  # Cron Job: free tier — runs the pipeline every 3 hours
+  - type: cron
     name: osi-news-automation
     runtime: python
     repo: https://github.com/Jkavya100/osi-news-automation
     branch: main
+    schedule: "0 */3 * * *"       # every 3 hours (UTC)
     buildCommand: pip install -r requirements-render.txt
-    startCommand: python run_automation.py --mode scheduled
+    startCommand: python run_automation.py --mode once
     plan: free
     envVars:
       # ---- Groq LLM ----
