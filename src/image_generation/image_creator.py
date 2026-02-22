@@ -482,11 +482,6 @@ def generate_article_image(
     width = max(512, (width // 8) * 8)
     height = max(512, (height // 8) * 8)
 
-    token = get_hf_token()
-    if not token:
-        logger.warning("HF_ACCESS_TOKEN not set — falling back to placeholder image")
-        return create_placeholder_image(article, output_dir)
-
     # Create output directory
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -495,18 +490,52 @@ def generate_article_image(
     prompt = build_image_prompt(article)
     negative_prompt = build_negative_prompt()
 
-    # Call HuggingFace
-    image_bytes = generate_with_huggingface(
-        prompt=prompt,
-        negative_prompt=negative_prompt,
-        width=width,
-        height=height,
-        num_inference_steps=num_steps,
-        guidance_scale=guidance_scale,
-    )
+    # Call HuggingFace if token exists
+    image_bytes = None
+    token = get_hf_token()
+    if token:
+        image_bytes = generate_with_huggingface(
+            prompt=prompt,
+            negative_prompt=negative_prompt,
+            width=width,
+            height=height,
+            num_inference_steps=num_steps,
+            guidance_scale=guidance_scale,
+        )
+    else:
+        logger.warning("HF_ACCESS_TOKEN not set — skipping HuggingFace API")
+
+    # Fallback 1: Pollinations.ai (Free, Tokenless AI generation)
+    if not image_bytes:
+        logger.info("Falling back to Pollinations.ai (free AI image generator)...")
+        image_bytes = generate_with_pollinations(
+            prompt=prompt,
+            width=width,
+            height=height
+        )
+
+    # Fallback 2: AI Horde (Free, community-powered, no auth required)
+    if not image_bytes:
+        logger.info("Falling back to AI Horde (community-powered free AI)...")
+        image_bytes = generate_with_aihorde(
+            prompt=prompt,
+            width=width,
+            height=height
+        )
+
+    # Fallback 3: Unsplash (Free stock photos)
+    if not image_bytes:
+        logger.info("Falling back to Unsplash stock photo API...")
+        topic = article.get('topic', article.get('heading', 'news'))
+        location = article.get('location', '')
+        image_bytes = get_unsplash_image(
+            keyword=f"{location} {topic}".strip(),
+            width=width,
+            height=height
+        )
 
     if not image_bytes:
-        logger.warning("HuggingFace SD 3.5 generation failed — falling back to placeholder")
+        logger.warning("All image sources failed — falling back to plain placeholder")
         return create_placeholder_image(article, output_dir)
 
     # Save image
@@ -603,6 +632,210 @@ def create_placeholder_image(
     except Exception as e:
         logger.error(f"Failed to create placeholder: {e}")
         return None
+
+
+# ===========================================
+# TOKENLESS CLOUD API FALLBACKS
+# ===========================================
+
+def generate_with_pollinations(
+    prompt: str,
+    width: int = 1024,
+    height: int = 1024
+) -> Optional[bytes]:
+    """
+    Generate an AI image using Pollinations.ai.
+    This service is completely free, requires no tokens/auth, and explicitly
+    supports automated workflows. Retries once on transient errors.
+    """
+    import urllib.parse
+    import time as _time
+    
+    # Strip the photorealism suffix to not overload Pollinations
+    clean_prompt = prompt.split(', Canon EOS')[0] if ', Canon EOS' in prompt else prompt
+    encoded_prompt = urllib.parse.quote(clean_prompt)
+    
+    # Seed for random variation
+    seed = int(datetime.now().timestamp())
+    
+    # Pollinations text-to-image URL
+    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true"
+    
+    # Retry up to 2 times (Pollinations can return intermittent 5xx errors)
+    for attempt in range(2):
+        try:
+            logger.info(f"🖼️  Calling Pollinations.ai ({width}x{height}, attempt {attempt + 1}/2)...")
+            response = requests.get(url, timeout=60)
+            response.raise_for_status()
+            
+            content_type = response.headers.get("Content-Type", "")
+            if "image" in content_type:
+                logger.success(f"✅ Pollinations image generated ({len(response.content) / 1024:.1f} KB)")
+                return response.content
+                
+            logger.error("Pollinations.ai returned non-image content")
+            
+        except requests.exceptions.Timeout:
+            logger.error("Pollinations.ai API timed out")
+        except Exception as e:
+            logger.error(f"Pollinations.ai attempt {attempt + 1} failed: {e}")
+        
+        if attempt == 0:
+            logger.info("Retrying Pollinations.ai in 5 seconds...")
+            _time.sleep(5)
+    
+    return None
+
+
+def generate_with_aihorde(
+    prompt: str,
+    width: int = 1024,
+    height: int = 1024
+) -> Optional[bytes]:
+    """
+    Generate an AI image using AI Horde (stablehorde.net).
+    Community-powered, 100% free, no authentication required.
+    Uses anonymous API key '0000000000' for unauthenticated access.
+    """
+    import time as _time
+
+    HORDE_API = "https://stablehorde.net/api/v2"
+
+    # Snap dimensions to valid SD sizes (multiples of 64, max 1024)
+    w = min(1024, max(512, (width // 64) * 64))
+    h = min(1024, max(512, (height // 64) * 64))
+
+    # Shorten prompt — Horde models work best with concise prompts
+    clean_prompt = prompt[:500]
+
+    payload = {
+        "prompt": clean_prompt,
+        "params": {
+            "width": w,
+            "height": h,
+            "steps": 25,
+            "cfg_scale": 7.0,
+            "sampler_name": "k_euler_a",
+        },
+        "nsfw": False,
+        "censor_nsfw": True,
+        "models": ["Deliberate"],
+        "r2": True,
+    }
+
+    headers = {
+        "apikey": "0000000000",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        logger.info(f"🖼️  Submitting job to AI Horde ({w}x{h})...")
+
+        # 1) Submit async job
+        resp = requests.post(f"{HORDE_API}/generate/async", json=payload, headers=headers, timeout=30)
+        if resp.status_code not in (200, 202):
+            logger.error(f"AI Horde submission failed: HTTP {resp.status_code} — {resp.text[:200]}")
+            return None
+
+        job_id = resp.json().get("id")
+        if not job_id:
+            logger.error("AI Horde returned no job ID")
+            return None
+
+        logger.info(f"   Job queued: {job_id}")
+
+        # 2) Poll for completion (max ~60 seconds)
+        for attempt in range(12):
+            _time.sleep(5)
+            check = requests.get(f"{HORDE_API}/generate/check/{job_id}", timeout=15)
+            if check.status_code != 200:
+                continue
+            status = check.json()
+            if status.get("done"):
+                break
+            wait_secs = status.get("wait_time", 0)
+            if attempt % 4 == 0:
+                logger.info(f"   AI Horde generating... (est. {wait_secs}s remaining)")
+        else:
+            logger.warning("AI Horde generation timed out after 60s")
+            return None
+
+        # 3) Fetch the completed image
+        result = requests.get(f"{HORDE_API}/generate/status/{job_id}", timeout=15)
+        if result.status_code != 200:
+            logger.error(f"AI Horde status fetch failed: HTTP {result.status_code}")
+            return None
+
+        generations = result.json().get("generations", [])
+        if not generations:
+            logger.error("AI Horde returned no generations")
+            return None
+
+        img_url = generations[0].get("img")
+        if not img_url:
+            logger.error("AI Horde generation has no image URL")
+            return None
+
+        # Download the image
+        img_resp = requests.get(img_url, timeout=30)
+        img_resp.raise_for_status()
+
+        if len(img_resp.content) > 1000:
+            logger.success(f"✅ AI Horde image generated ({len(img_resp.content) / 1024:.1f} KB)")
+            return img_resp.content
+
+        logger.error("AI Horde returned unexpectedly small image")
+        return None
+
+    except requests.exceptions.Timeout:
+        logger.error("AI Horde API timed out")
+        return None
+    except Exception as e:
+        logger.error(f"AI Horde API unexpected error: {e}")
+        return None
+
+
+def get_unsplash_image(
+    keyword: str,
+    width: int = 1024,
+    height: int = 1024
+) -> Optional[bytes]:
+    """
+    Fetch a stock photo from Unsplash based on keywords.
+    Free, rate-limit friendly, purely relies on standard HTTP routing to stock images.
+    """
+    import urllib.parse
+    
+    # Extract only main nouns/keywords to get better Unsplash results
+    clean_keyword = keyword.replace(':', ' ').replace(',', ' ')
+    words = [w for w in clean_keyword.split() if len(w) > 3 and w.lower() not in ['news', 'update', 'breaking']]
+    search_term = ",".join(words[:4]) # Max 4 terms for Unsplash
+    
+    if not search_term:
+        search_term = "news,event"
+        
+    encoded_term = urllib.parse.quote(search_term)
+    
+    # Source Unsplash generic resolution URL
+    url = f"https://source.unsplash.com/{width}x{height}/?{encoded_term}"
+    
+    try:
+        logger.info(f"\U0001f4f8 Fetching Unsplash stock photo for '{search_term}'...")
+        # Unsplash redirects to the actual image, allowing redirects is key
+        response = requests.get(url, allow_redirects=True, timeout=15)
+        response.raise_for_status()
+        
+        content_type = response.headers.get("Content-Type", "")
+        if "image" in content_type:
+            logger.success(f"\u2705 Unsplash photo retrieved ({len(response.content) / 1024:.1f} KB)")
+            return response.content
+            
+        return None
+        
+    except Exception as e:
+        logger.error(f"Unsplash API fallback failed: {e}")
+        return None
+
 
 
 # ===========================================

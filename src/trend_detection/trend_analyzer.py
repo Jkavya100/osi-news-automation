@@ -58,14 +58,13 @@ def get_model():
 # ===========================================
 
 def _keyword_similarity(text_a: str, text_b: str) -> float:
-    """Simple keyword overlap similarity (Jaccard) as fallback."""
-    words_a = set(re.findall(r'\b[a-zA-Z]{3,}\b', text_a.lower())) - STOP_WORDS
-    words_b = set(re.findall(r'\b[a-zA-Z]{3,}\b', text_b.lower())) - STOP_WORDS
-    if not words_a or not words_b:
+    """Fallback text similarity using difflib sequence matching."""
+    if not text_a or not text_b:
         return 0.0
-    intersection = words_a & words_b
-    union = words_a | words_b
-    return len(intersection) / len(union)
+        
+    import difflib
+    # Compare raw strings (case-insensitive)
+    return difflib.SequenceMatcher(None, text_a.lower(), text_b.lower()).ratio()
 
 
 # ===========================================

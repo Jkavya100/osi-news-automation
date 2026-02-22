@@ -527,6 +527,7 @@ class MongoDBClient:
         Check if an article is a duplicate of existing articles.
         
         Compares with articles from the last 48 hours using sentence embeddings.
+        If sentence-transformers is not available, falls back to difflib.SequenceMatcher.
         
         Args:
             article_text: Text content of the article.
@@ -545,27 +546,63 @@ class MongoDBClient:
             # Get embedding for new article
             new_embedding = self._get_embedding(article_text)
             
-            # Get recent articles with embeddings (last 48 hours)
+            # Get recent articles (last 48 hours)
             cutoff_time = datetime.utcnow() - timedelta(hours=48)
             
-            recent_articles = self.articles.find(
-                {
-                    "scraped_at": {"$gte": cutoff_time},
-                    "embedding": {"$exists": True}
-                },
-                {"embedding": 1, "heading": 1}
-            )
-            
-            for article in recent_articles:
-                if "embedding" in article and article["embedding"]:
-                    similarity = self._cosine_similarity(new_embedding, article["embedding"])
+            # If embeddings are available, use them
+            if new_embedding is not None:
+                recent_articles = self.articles.find(
+                    {
+                        "scraped_at": {"$gte": cutoff_time},
+                        "embedding": {"$exists": True}
+                    },
+                    {"embedding": 1, "heading": 1}
+                )
+                
+                for article in recent_articles:
+                    if "embedding" in article and article["embedding"]:
+                        similarity = self._cosine_similarity(new_embedding, article["embedding"])
+                        
+                        if similarity >= similarity_threshold:
+                            logger.debug(
+                                f"Duplicate detected (embedding similarity: {similarity:.2f}): "
+                                f"{article.get('heading', 'Unknown')[:50]}..."
+                            )
+                            return True
+            else:
+                # Lightweight Fallback: Use difflib on the text/heading
+                import difflib
+                
+                # Query for articles that have either a story, content, or description
+                recent_articles = self.articles.find(
+                    {
+                        "scraped_at": {"$gte": cutoff_time},
+                        "$or": [
+                            {"story": {"$exists": True}},
+                            {"content": {"$exists": True}},
+                            {"description": {"$exists": True}}
+                        ]
+                    },
+                    {"story": 1, "content": 1, "description": 1, "heading": 1}
+                )
+                
+                # Use a slightly stricter threshold for difflib since it matches exact characters
+                fallback_threshold = min(0.9, similarity_threshold + 0.1) 
+                
+                for article in recent_articles:
+                    # Try to get whatever text representing the article is available
+                    existing_text = article.get("story") or article.get("content") or article.get("description", "")
                     
-                    if similarity >= similarity_threshold:
-                        logger.debug(
-                            f"Duplicate detected (similarity: {similarity:.2f}): "
-                            f"{article.get('heading', 'Unknown')[:50]}..."
-                        )
-                        return True
+                    if existing_text:
+                        # Compare the first 500 characters to save time
+                        similarity = difflib.SequenceMatcher(None, article_text[:500], existing_text[:500]).ratio()
+                        
+                        if similarity >= fallback_threshold:
+                            logger.debug(
+                                f"Duplicate detected (textual similarity: {similarity:.2f}): "
+                                f"{article.get('heading', 'Unknown')[:50]}..."
+                            )
+                            return True
             
             return False
             

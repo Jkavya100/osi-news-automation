@@ -389,8 +389,9 @@ def upload_to_hocalwire(
     if not session_id:
         session_id = generate_session_id()
     
-    # Validate article
+    # Validations
     heading = article.get('heading', '')
+    sub_heading = article.get('sub_heading', '')
     story = article.get('story', '')
     
     if not heading or not story:
@@ -439,6 +440,7 @@ def upload_to_hocalwire(
 
     payload = {
         "heading": heading,
+        "sub_heading": sub_heading,  # Add subheading mapping here
         "mediaIds": image_url,
         "story": formatted_story,  # Use HTML-formatted content
         "categoryId": category_id,  # Use dynamically extracted category

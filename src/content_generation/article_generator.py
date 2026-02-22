@@ -261,7 +261,8 @@ CRITICAL WRITING RULES:
 
 ARTICLE REQUIREMENTS:
 1. Write a compelling headline (10-15 words) about "{topic}" ONLY
-2. Create a comprehensive article of at least {target_words} words{subheading_instruction}
+2. Craft a concise, descriptive subheading summarizing the core event (MAXIMUM 150 characters)
+3. Create a comprehensive article of at least {target_words} words{subheading_instruction}
 4. Start with proper dateline (e.g., "DUBAI, January 23 –")
 5. Strong lead paragraph: who, what, when, where, why - ALL about "{topic}"
 6. Use clear subheadings to organize the story (follow specialized protocol if applicable)
@@ -291,6 +292,8 @@ WRITING STYLE:
 
 OUTPUT FORMAT:
 # [Headline - Direct and Clear - ONLY about "{topic}"]
+
+### [Subheading - MAXIMUM 150 CHARACTERS - concise summary]
 
 [DATELINE], [Date] –
 
@@ -356,10 +359,25 @@ def parse_generated_article(generated_text: str) -> Dict:
     headline_index = -1
     
     for i, line in enumerate(lines):
-        if line.strip().startswith('# '):
-            heading = line.replace('# ', '').strip()
+        if line.strip().startswith('# ') or line.strip().startswith('## '):
+            heading = line.replace('# ', '').replace('## ', '').strip()
             headline_index = i
             break
+            
+    # Extract subheading (first line starting with ### after headline)
+    sub_heading = ""
+    subheading_index = -1
+    
+    if headline_index >= 0:
+        for i in range(headline_index + 1, min(headline_index + 10, len(lines))):
+            line = lines[i].strip()
+            if line.startswith('### '):
+                sub_heading = line.replace('### ', '').strip()
+                # Enforce 150 char limit strictly
+                if len(sub_heading) > 150:
+                    sub_heading = sub_heading[:147] + "..."
+                subheading_index = i
+                break
     
     # If no markdown heading found, use first non-empty line
     if not heading:
@@ -369,10 +387,12 @@ def parse_generated_article(generated_text: str) -> Dict:
                 headline_index = i
                 break
     
-    # Extract body (everything after headline)
+    # Extract body (everything after headline/subheading)
+    body_start_index = max(headline_index, subheading_index)
+    
     body_lines = []
-    if headline_index >= 0:
-        body_lines = lines[headline_index + 1:]
+    if body_start_index >= 0:
+        body_lines = lines[body_start_index + 1:]
     else:
         body_lines = lines[1:]  # Skip first line
     
@@ -383,8 +403,11 @@ def parse_generated_article(generated_text: str) -> Dict:
     story = re.sub(r'^[\s\n]+', '', story)
     story = re.sub(r'[\s\n]+$', '', story)
     
+    # Dateline is usually the first paragraph now; let's keep it in the story
+    
     return {
         "heading": heading,
+        "sub_heading": sub_heading,
         "story": story
     }
 

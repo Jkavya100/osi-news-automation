@@ -189,22 +189,21 @@ def run_pipeline(dry_run: bool = False) -> dict:
         logger.info("=" * 80)
         
         top_n_trends = int(os.getenv('TOP_TRENDS_COUNT', 5))
-        
-        # Each scraped article becomes its own focused trend (no mixing)
-        # This ensures each generated article covers ONE topic only.
-        trends = []
-        for article in articles[:top_n_trends]:
-            trends.append({
-                'topic': article.get('heading', 'News Update'),
-                'articles': [article],
-                'article_count': 1,
-                'keywords': []
-            })
+        min_cluster_size = int(os.getenv('MIN_CLUSTER_SIZE', 1))
+        similarity_threshold = float(os.getenv('DUPLICATE_SIMILARITY_THRESHOLD', 0.6))
+
+        # Use the actual NLP clustering from trend_analyzer to group similar stories into single trends
+        trends = detect_trends(
+            articles,
+            top_n=top_n_trends,
+            min_cluster_size=min_cluster_size,
+            similarity_threshold=similarity_threshold
+        )
         
         stats['trends_detected'] = len(trends)
-        logger.info(f"✅ Detected {len(trends)} trends:")
+        logger.info(f"✅ Detected {len(trends)} distinct trends from {len(articles)} articles (duplicates merged):")
         for i, trend in enumerate(trends, 1):
-            logger.info(f"   {i}. {trend['topic']} ({trend['article_count']} articles)")
+            logger.info(f"   {i}. {trend['topic']} ({trend['article_count']} sources)")
         
         # Save trends to database
         for trend in trends:
