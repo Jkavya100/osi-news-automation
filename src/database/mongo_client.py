@@ -570,37 +570,67 @@ class MongoDBClient:
                             )
                             return True
             else:
-                # Lightweight Fallback: Use difflib on the text/heading
+                # Lightweight Fallback: Use difflib + keyword similarity
                 import difflib
+                import re
                 
-                # Query for articles that have either a story, content, or description
+                _STOP = {'the','a','an','and','or','but','in','on','at','to','for',
+                         'of','with','by','from','as','is','was','are','were','be',
+                         'has','have','had','its','it','this','that','not','no',
+                         'says','said','say','after','over','into','news','update'}
+                
+                def _heading_jaccard(h1: str, h2: str) -> float:
+                    """Word-set overlap (Jaccard) — robust to word reordering by LLM."""
+                    w1 = set(re.findall(r'[a-z]{3,}', h1.lower())) - _STOP
+                    w2 = set(re.findall(r'[a-z]{3,}', h2.lower())) - _STOP
+                    if not w1 or not w2:
+                        return 0.0
+                    return len(w1 & w2) / len(w1 | w2)
+                
+                # Query for articles that have either a story, content, or heading
                 recent_articles = self.articles.find(
                     {
                         "scraped_at": {"$gte": cutoff_time},
                         "$or": [
                             {"story": {"$exists": True}},
                             {"content": {"$exists": True}},
-                            {"description": {"$exists": True}}
+                            {"description": {"$exists": True}},
+                            {"heading": {"$exists": True}}
                         ]
                     },
                     {"story": 1, "content": 1, "description": 1, "heading": 1}
                 )
                 
-                # Use a slightly stricter threshold for difflib since it matches exact characters
-                fallback_threshold = min(0.9, similarity_threshold + 0.1) 
+                # Content similarity threshold (strict — character-level match)
+                content_threshold = min(0.9, similarity_threshold + 0.1)
+                # Heading keyword overlap threshold (catches same-topic with reordered words)
+                heading_threshold = 0.5
+                
+                # Extract heading from input for heading-vs-heading comparison
+                # Input may be "heading text story text..." — take first line
+                input_heading = article_text.split('\n')[0][:150].strip()
                 
                 for article in recent_articles:
-                    # Try to get whatever text representing the article is available
-                    existing_text = article.get("story") or article.get("content") or article.get("description", "")
+                    existing_heading = article.get("heading", "")
                     
+                    # 1) Heading keyword overlap (catches same-topic rewrites by LLM)
+                    if existing_heading and input_heading:
+                        heading_sim = _heading_jaccard(input_heading, existing_heading)
+                        if heading_sim >= heading_threshold:
+                            logger.info(
+                                f"Duplicate detected (heading keyword overlap: {heading_sim:.2f}): "
+                                f"{existing_heading[:60]}..."
+                            )
+                            return True
+                    
+                    # 2) Content-to-content comparison (catches exact reposts)
+                    existing_text = article.get("story") or article.get("content") or article.get("description", "")
                     if existing_text:
-                        # Compare the first 500 characters to save time
                         similarity = difflib.SequenceMatcher(None, article_text[:500], existing_text[:500]).ratio()
-                        
-                        if similarity >= fallback_threshold:
-                            logger.debug(
-                                f"Duplicate detected (textual similarity: {similarity:.2f}): "
-                                f"{article.get('heading', 'Unknown')[:50]}..."
+                        if similarity >= content_threshold:
+                            logger.info(
+                                f"Duplicate detected (content similarity: {similarity:.2f}): "
+                                f"{existing_heading[:60]}..."
                             )
                             return True
             

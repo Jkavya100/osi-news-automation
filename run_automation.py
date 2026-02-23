@@ -224,6 +224,28 @@ def run_pipeline(dry_run: bool = False) -> dict:
             logger.info(f"\n📝 Processing trend {i+1}/{len(trends)}: {trend['topic']}")
             
             try:
+                # ── Cross-run duplicate check ──────────────────────────
+                # Build a representative text from the trend's headline(s)
+                # and check if we already generated a very similar article.
+                representative_text = trend.get('topic', '')
+                if trend.get('articles'):
+                    # Use the first article's heading + story snippet for richer comparison
+                    first = trend['articles'][0]
+                    representative_text = (
+                        first.get('heading', '') + ' ' +
+                        first.get('story', first.get('content', ''))[:300]
+                    )
+                
+                similarity_threshold = float(os.getenv('DUPLICATE_SIMILARITY_THRESHOLD', 0.85))
+                if db.check_duplicate(representative_text, similarity_threshold=similarity_threshold):
+                    logger.warning(
+                        f"⏭️ Skipping trend '{trend['topic']}' — "
+                        f"similar article already exists in database"
+                    )
+                    stats.setdefault('articles_skipped_duplicate', 0)
+                    stats['articles_skipped_duplicate'] += 1
+                    continue
+                
                 # Generate article
                 target_words = int(os.getenv('ARTICLE_MIN_WORDS', 800))
                 article = generate_article(trend, target_words=target_words)
