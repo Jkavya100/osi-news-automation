@@ -447,7 +447,9 @@ def run_pipeline(dry_run: bool = False) -> dict:
         logger.info("=" * 80)
         
         # Save pipeline stats
-        stats_file = Path("output/json") / f"pipeline_stats_{session_id}.json"
+        stats_dir = Path("output/json")
+        stats_dir.mkdir(parents=True, exist_ok=True)
+        stats_file = stats_dir / f"pipeline_stats_{session_id}.json"
         with open(stats_file, 'w', encoding='utf-8') as f:
             json.dump(stats, f, indent=2)
         logger.info(f"📊 Pipeline stats saved: {stats_file}")
