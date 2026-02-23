@@ -554,6 +554,7 @@ class MongoDBClient:
                 recent_articles = self.articles.find(
                     {
                         "scraped_at": {"$gte": cutoff_time},
+                        "pipeline_stage": "generated",
                         "embedding": {"$exists": True}
                     },
                     {"embedding": 1, "heading": 1}
@@ -587,24 +588,22 @@ class MongoDBClient:
                         return 0.0
                     return len(w1 & w2) / len(w1 | w2)
                 
-                # Query for articles that have either a story, content, or heading
+                # IMPORTANT: Only compare against previously GENERATED articles,
+                # NOT raw scraped articles (which are saved in the same pipeline run).
                 recent_articles = self.articles.find(
                     {
                         "scraped_at": {"$gte": cutoff_time},
-                        "$or": [
-                            {"story": {"$exists": True}},
-                            {"content": {"$exists": True}},
-                            {"description": {"$exists": True}},
-                            {"heading": {"$exists": True}}
-                        ]
+                        "pipeline_stage": "generated",
+                        "heading": {"$exists": True}
                     },
-                    {"story": 1, "content": 1, "description": 1, "heading": 1}
+                    {"story": 1, "heading": 1}
                 )
                 
                 # Content similarity threshold (strict — character-level match)
                 content_threshold = min(0.9, similarity_threshold + 0.1)
-                # Heading keyword overlap threshold (catches same-topic with reordered words)
-                heading_threshold = 0.5
+                # Heading keyword overlap threshold
+                # 0.65 = requires ~2/3 keyword overlap to flag as duplicate
+                heading_threshold = 0.65
                 
                 # Extract heading from input for heading-vs-heading comparison
                 # Input may be "heading text story text..." — take first line
@@ -624,7 +623,7 @@ class MongoDBClient:
                             return True
                     
                     # 2) Content-to-content comparison (catches exact reposts)
-                    existing_text = article.get("story") or article.get("content") or article.get("description", "")
+                    existing_text = article.get("story", "")
                     if existing_text:
                         similarity = difflib.SequenceMatcher(None, article_text[:500], existing_text[:500]).ratio()
                         if similarity >= content_threshold:
