@@ -134,6 +134,7 @@ def run_pipeline(dry_run: bool = False) -> dict:
         'articles_scraped': 0,
         'trends_detected': 0,
         'articles_generated': 0,
+        'articles_skipped_duplicate': 0,
         'images_created': 0,
         'translations_created': 0,
         'uploads_successful': 0,
@@ -224,28 +225,6 @@ def run_pipeline(dry_run: bool = False) -> dict:
             logger.info(f"\n📝 Processing trend {i+1}/{len(trends)}: {trend['topic']}")
             
             try:
-                # ── Cross-run duplicate check ──────────────────────────
-                # Build a representative text from the trend's headline(s)
-                # and check if we already generated a very similar article.
-                representative_text = trend.get('topic', '')
-                if trend.get('articles'):
-                    # Use the first article's heading + story snippet for richer comparison
-                    first = trend['articles'][0]
-                    representative_text = (
-                        first.get('heading', '') + ' ' +
-                        first.get('story', first.get('content', ''))[:300]
-                    )
-                
-                similarity_threshold = float(os.getenv('DUPLICATE_SIMILARITY_THRESHOLD', 0.85))
-                if db.check_duplicate(representative_text, similarity_threshold=similarity_threshold):
-                    logger.warning(
-                        f"⏭️ Skipping trend '{trend['topic']}' — "
-                        f"similar article already exists in database"
-                    )
-                    stats.setdefault('articles_skipped_duplicate', 0)
-                    stats['articles_skipped_duplicate'] += 1
-                    continue
-                
                 # Generate article
                 target_words = int(os.getenv('ARTICLE_MIN_WORDS', 800))
                 article = generate_article(trend, target_words=target_words)
@@ -255,9 +234,24 @@ def run_pipeline(dry_run: bool = False) -> dict:
                     stats['errors'].append(f"Article generation failed: {trend['topic']}")
                     continue
                 
+                # Attach session metadata before duplicate check
                 article['session_id'] = session_id
                 article['pipeline_stage'] = 'generated'
                 article['trend_index'] = i
+                
+                # ── Post-generation duplicate check ──────────────────
+                # Compare the LLM-generated text against previously
+                # generated LLM text in the DB (like vs like).
+                generated_text = article.get('heading', '') + ' ' + article.get('story', '')
+                dup_threshold = float(os.getenv('DUPLICATE_SIMILARITY_THRESHOLD', 0.75))
+                if db.check_duplicate(generated_text, similarity_threshold=dup_threshold, exclude_session_id=session_id):
+                    logger.warning(
+                        f"⏭️ Skipping trend '{trend['topic']}' — "
+                        f"similar article already exists in database (post-generation check)"
+                    )
+                    stats['articles_skipped_duplicate'] += 1
+                    continue
+                
                 generated_articles.append(article)
                 
                 logger.info(f"✅ Generated article: {article['heading'][:60]}...")
@@ -434,11 +428,11 @@ def run_pipeline(dry_run: bool = False) -> dict:
         logger.info(f"📰 Articles Scraped: {stats['articles_scraped']}")
         logger.info(f"🔍 Trends Detected: {stats['trends_detected']}")
         logger.info(f"✍️  Articles Generated: {stats['articles_generated']}")
+        logger.info(f"⏭️  Duplicates Skipped: {stats['articles_skipped_duplicate']}")
         logger.info(f"🎨 Images Created: {stats['images_created']}")
         logger.info(f"🌐 Translations Created: {stats['translations_created']}")
         logger.info(f"📤 Uploads Successful: {stats['uploads_successful']}")
-        logger.info(f"📱 Social Posts Generated: {stats['social_posts_generated']}")
-        
+        logger.info(f"📱 Social Posts Generated: {stats['social_posts_generated']}")        
         if stats['errors']:
             logger.warning(f"⚠️  Errors Encountered: {len(stats['errors'])}")
             for error in stats['errors'][:5]:  # Show first 5 errors
