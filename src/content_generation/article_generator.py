@@ -263,7 +263,7 @@ ARTICLE REQUIREMENTS:
 1. Write a compelling headline (10-15 words) about "{topic}" ONLY
 2. Craft a concise, descriptive subheading summarizing the core event (MAXIMUM 150 characters)
 3. Create a comprehensive article of at least {target_words} words{subheading_instruction}
-4. Start with proper dateline (e.g., "DUBAI, January 23 –")
+4. Start with proper dateline using today's date (e.g., "DUBAI, {datetime.now().strftime('%B')} {datetime.now().day} –")
 5. Strong lead paragraph: who, what, when, where, why - ALL about "{topic}"
 6. Use clear subheadings to organize the story (follow specialized protocol if applicable)
 7. End with implications or future outlook for "{topic}"
