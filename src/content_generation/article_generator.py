@@ -16,6 +16,16 @@ from collections import Counter
 from loguru import logger
 from dotenv import load_dotenv
 
+from src.content_generation.prompt_builder import (
+    build_synthesis_prompt,
+    detect_story_type,
+    extract_source_digest,
+    resolve_dateline,
+    extract_newsworthiness_signals,
+    parse_generated_article,
+    SYSTEM_MESSAGE,
+)
+
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
@@ -61,355 +71,7 @@ def get_groq_client():
         return None
 
 
-# ===========================================
-# PROMPT BUILDING
-# ===========================================
 
-def detect_story_type(articles: List[Dict], topic: str) -> str:
-    """
-    Detect story type based on keywords and content.
-    
-    Returns: 'scientific', 'economic', 'social', 'political', or 'general'
-    """
-    combined_text = topic.lower() + " "
-    for article in articles[:5]:
-        combined_text += article.get('heading', '').lower() + " "
-        combined_text += article.get('story', '')[:200].lower() + " "
-    
-    # Scientific indicators
-    scientific_keywords = ['study', 'research', 'findings', 'scientist', 'discovery', 
-                          'breakthrough', 'published', 'journal', 'peer-reviewed', 
-                          'experiment', 'data', 'clinical', 'medical']
-    
-    # Economic indicators
-    economic_keywords = ['economy', 'market', 'gdp', 'inflation', 'stock', 'trade',
-                        'financial', 'investment', 'currency', 'recession', 'growth',
-                        'employment', 'industry', 'revenue', 'profit']
-    
-    # Social/Cultural indicators
-    social_keywords = ['trend', 'social', 'cultural', 'generation', 'adoption',
-                      'behavior', 'demographic', 'movement', 'community', 'society',
-                      'lifestyle', 'millennials', 'gen z', 'viral']
-    
-    # Count matches
-    scientific_count = sum(1 for kw in scientific_keywords if kw in combined_text)
-    economic_count = sum(1 for kw in economic_keywords if kw in combined_text)
-    social_count = sum(1 for kw in social_keywords if kw in combined_text)
-    
-    # Determine type based on highest count
-    if scientific_count >= 3:
-        return 'scientific'
-    elif economic_count >= 3:
-        return 'economic'
-    elif social_count >= 3:
-        return 'social'
-    else:
-        return 'general'
-
-
-def build_synthesis_prompt(
-    articles: List[Dict], 
-    topic: str, 
-    target_words: int,
-    include_subheadings: bool = True
-) -> str:
-    """
-    Build the ENHANCED prompt for article synthesis with specialized protocols.
-    
-    Args:
-        articles: List of source articles.
-        topic: The trend topic name.
-        target_words: Target word count.
-        include_subheadings: Whether to include subheadings.
-        
-    Returns:
-        Formatted prompt string with specialized protocol activation.
-    """
-    # Detect story type
-    story_type = detect_story_type(articles, topic)
-    
-    # Prepare source summaries (limit to 10 articles, 500 chars each)
-    source_summaries = []
-    
-    for i, article in enumerate(articles[:10], 1):
-        source_name = article.get('source_name', 'Unknown Source')
-        heading = article.get('heading', 'No headline')
-        story = article.get('story', '')[:500]  # First 500 chars
-        location = article.get('location', 'Unknown')
-        
-        summary = f"""Source {i} ({source_name}, {location}):
-Headline: {heading}
-Content: {story}..."""
-        
-        source_summaries.append(summary)
-    
-    # Build subheadings instruction
-    subheading_instruction = ""
-    if include_subheadings:
-        subheading_count = int(os.getenv('SUBHEADING_COUNT', 5))
-        subheading_instruction = f"""
-3. Include {subheading_count} descriptive subheadings (use ## markdown format)"""
-    
-    # Specialized protocol sections based on story type
-    specialized_protocol = ""
-    
-    if story_type == 'scientific':
-        specialized_protocol = """
-
-SPECIALIZED SCIENTIFIC STORY PROTOCOL:
-Your article MUST include these analysis elements:
-1. **Findings vs. Interpretation**: Separate raw findings from researcher commentary
-2. **Research Context**: Place discovery within existing research landscape
-3. **Methodology**: Note study strengths and limitations (sample size, peer-review status)
-4. **Expert Reception**: Include spectrum of expert opinion (supporters and skeptics)
-5. **Path Forward**: Timeline for replication or practical application
-
-REQUIRED SECTIONS for Scientific Stories:
-## The Discovery
-## Scientific Context
-## Methodology & Reliability
-## Expert Reception
-## Path Forward
-"""
-    elif story_type == 'economic':
-        specialized_protocol = """
-
-SPECIALIZED ECONOMIC STORY PROTOCOL:
-Your article MUST include these analysis elements:
-1. **Real Economy vs. Markets**: Distinguish actual economic impact from market reactions
-2. **Leading vs. Lagging Indicators**: Identify what type of data this represents
-3. **Transmission Mechanisms**: Explain HOW effects spread through the economy
-4. **Policy Response**: Document government/central bank actions and effectiveness
-5. **Historical Context**: Compare to similar past events when relevant
-
-REQUIRED SECTIONS for Economic Stories:
-## The Economic Event
-## Market Response
-## Transmission & Impact
-## Policy & Intervention
-## Historical Context
-"""
-    elif story_type == 'social':
-        specialized_protocol = """
-
-SPECIALIZED SOCIAL/CULTURAL STORY PROTOCOL:
-Your article MUST include these analysis elements:
-1. **Demographics**: Break down by age groups, regions, or other relevant demographics
-2. **Early Adopters vs. Resistors**: Identify who's leading and who's resisting
-3. **Institutional Adaptation**: How organizations/institutions are responding
-4. **Velocity**: How fast is this change happening (rapid/moderate/slow)
-5. **Substance**: Is this performative or substantive change?
-
-REQUIRED SECTIONS for Social Stories:
-## The Shift
-## Who's Leading, Who's Resisting
-## Institutional Response
-## Speed & Scale
-## Substance Assessment
-"""
-    
-    # Information triage guidance
-    triage_guidance = """
-
-INFORMATION QUALITY TIERS (Apply This Filter):
-✅ TIER 1 - MUST INCLUDE: Verified by 3+ sources, high impact, core to story
-✅ TIER 2 - SHOULD INCLUDE: 2 sources or credible expert analysis, moderate impact
-⚠️ TIER 3 - COULD INCLUDE: Single credible source, clearly label as preliminary
-❌ TIER 4 - EXCLUDE: Unverified rumors, promotional content, irrelevant details
-"""
-    
-    prompt = f"""You are a professional journalist for a major news organization writing about: {topic}
-
-STORY TYPE DETECTED: {story_type.upper()}
-
-I have gathered {len(articles)} articles from different sources. Your task is to write ONE comprehensive, factual article about this SINGLE topic.
-
-SOURCE MATERIALS (for reference only):
-{chr(10).join(source_summaries)}
-{triage_guidance}
-{specialized_protocol}
-
-🚨 CRITICAL TOPIC FOCUS RULES - READ CAREFULLY:
-1. The MAIN TOPIC is: "{topic}"
-2. You MUST write EXCLUSIVELY about this topic
-3. If you see MULTIPLE DIFFERENT topics in the sources (e.g., Gaza conflict AND Australian Open tennis), you MUST:
-   a) Identify which content relates to the MAIN TOPIC: "{topic}"
-   b) COMPLETELY IGNORE all content about other unrelated topics
-   c) DO NOT mention, reference, or include ANY information about unrelated topics
-4. Even if a source article contains mixed content, extract ONLY the parts relevant to "{topic}"
-5. If unsure whether content is related, ASK: "Does this directly relate to {topic}?" If NO, exclude it.
-
-EXAMPLES OF WHAT TO EXCLUDE:
-❌ If main topic is "Gaza Conflict" - DO NOT include: sports, entertainment, weather, unrelated countries
-❌ If main topic is "Australian Open" - DO NOT include: wars, conflicts, politics in other countries
-❌ If main topic is "Climate Summit" - DO NOT include: sports results, celebrity news, unrelated events
-
-CRITICAL WRITING RULES:
-1. Write as if YOU are the news organization directly reporting this story
-2. DO NOT use phrases like:
-   - "According to BBC News..."
-   - "As reported by Reuters..."
-   - "Sources say..."
-   - "Al Jazeera reported..."
-   - DO NOT mention any source names in the article
-3. Write in DIRECT journalistic voice - state facts directly
-4. Focus ONLY on the main topic "{topic}" - ABSOLUTELY NO unrelated news
-5. If the sources discuss different events, pick ONLY the content about "{topic}"
-6. Use objective, factual, AP Style journalism
-7. Apply the SPECIALIZED PROTOCOL sections above based on story type
-8. TRIPLE-CHECK before including any sentence: "Is this about {topic}? YES or NO?"
-
-ARTICLE REQUIREMENTS:
-1. Write a compelling headline (10-15 words) about "{topic}" ONLY
-2. Craft a concise, descriptive subheading summarizing the core event (MAXIMUM 150 characters)
-3. Create a comprehensive article of at least {target_words} words{subheading_instruction}
-4. Start with proper dateline using today's date (e.g., "DUBAI, {datetime.now().strftime('%B')} {datetime.now().day} –")
-5. Strong lead paragraph: who, what, when, where, why - ALL about "{topic}"
-6. Use clear subheadings to organize the story (follow specialized protocol if applicable)
-7. End with implications or future outlook for "{topic}"
-8. Use factual, professional tone throughout
-9. EVERY paragraph must be about "{topic}" - no exceptions
-
-IMPORTANT - WHAT TO AVOID:
-❌ DO NOT write "according to", "as reported by", "sources say"  
-❌ DO NOT mention BBC, Reuters, CNN, or any news organization names
-❌ DO NOT combine multiple unrelated stories (e.g., Gaza + Tennis)
-❌ DO NOT include content about topics unrelated to "{topic}"
-❌ DO NOT include your own opinions or speculation
-❌ DO NOT fabricate information not in sources
-❌ DO NOT include Tier 4 information (unverified, promotional)
-❌ DO NOT mention sports/entertainment if main topic is politics/conflict
-❌ DO NOT mention conflicts/wars if main topic is sports/entertainment
-
-WRITING STYLE:
-✅ "A car accident in Dubai has claimed the life of 19-year-old Marcus Fakana..."
-✅ "The incident occurred when a BMW driven by 20-year-old Marwaan Mohamed Huseen..."
-✅ "Police confirmed that the accident took place on..."
-
-❌ NOT: "According to BBC News, a car accident occurred..."
-❌ NOT: "Sources report that the incident..."
-❌ NOT: "Meanwhile, in a separate development, [unrelated topic]..."
-
-OUTPUT FORMAT:
-# [Headline - Direct and Clear - ONLY about "{topic}"]
-
-### [Subheading - MAXIMUM 150 CHARACTERS - concise summary]
-
-[DATELINE], [Date] –
-
-[Lead paragraph stating the main facts directly - ONLY about "{topic}"]
-
-## [First Subheading - follow specialized protocol if applicable]
-[Content about this specific aspect of "{topic}"]
-
-## [Second Subheading]  
-[Content about another aspect of "{topic}"]
-
-[Continue with relevant subheadings - ALL about "{topic}"...]
-
-FINAL REMINDER: This article is 100% about "{topic}". Do NOT include ANY content about other topics.
-
-Write the article NOW in direct journalistic voice with {story_type.upper()} story analysis:"""
-    
-    return prompt
-
-
-
-def build_fallback_prompt(articles: List[Dict], topic: str) -> str:
-    """
-    Build a simpler prompt for fallback generation.
-    
-    Used when primary generation fails.
-    """
-    headlines = [a.get('heading', '') for a in articles[:5]]
-    
-    prompt = f"""Write a 500-word news article about: {topic}
-
-Based on these headlines:
-{chr(10).join(f'- {h}' for h in headlines)}
-
-Include a headline, dateline, and 3 paragraphs. Use journalistic style.
-
-Begin:"""
-    
-    return prompt
-
-
-# ===========================================
-# ARTICLE PARSING
-# ===========================================
-
-def parse_generated_article(generated_text: str) -> Dict:
-    """
-    Parse LLM-generated text into structured article.
-    
-    Args:
-        generated_text: Raw text from LLM.
-        
-    Returns:
-        Dictionary with 'heading' and 'story' keys.
-    """
-    if not generated_text:
-        return {"heading": "", "story": ""}
-    
-    lines = generated_text.strip().split('\n')
-    
-    # Extract headline (first line starting with #)
-    heading = ""
-    headline_index = -1
-    
-    for i, line in enumerate(lines):
-        if line.strip().startswith('# ') or line.strip().startswith('## '):
-            heading = line.replace('# ', '').replace('## ', '').strip()
-            headline_index = i
-            break
-            
-    # Extract subheading (first line starting with ### after headline)
-    sub_heading = ""
-    subheading_index = -1
-    
-    if headline_index >= 0:
-        for i in range(headline_index + 1, min(headline_index + 10, len(lines))):
-            line = lines[i].strip()
-            if line.startswith('### '):
-                sub_heading = line.replace('### ', '').strip()
-                # Enforce 150 char limit strictly
-                if len(sub_heading) > 150:
-                    sub_heading = sub_heading[:147] + "..."
-                subheading_index = i
-                break
-    
-    # If no markdown heading found, use first non-empty line
-    if not heading:
-        for i, line in enumerate(lines):
-            if line.strip() and not line.startswith('#'):
-                heading = line.strip()
-                headline_index = i
-                break
-    
-    # Extract body (everything after headline/subheading)
-    body_start_index = max(headline_index, subheading_index)
-    
-    body_lines = []
-    if body_start_index >= 0:
-        body_lines = lines[body_start_index + 1:]
-    else:
-        body_lines = lines[1:]  # Skip first line
-    
-    # Clean up body
-    story = '\n'.join(body_lines).strip()
-    
-    # Remove any leading/trailing artifacts
-    story = re.sub(r'^[\s\n]+', '', story)
-    story = re.sub(r'[\s\n]+$', '', story)
-    
-    # Dateline is usually the first paragraph now; let's keep it in the story
-    
-    return {
-        "heading": heading,
-        "sub_heading": sub_heading,
-        "story": story
-    }
 
 
 def validate_topic_focus(article: Dict, topic: str, source_articles: List[Dict]) -> Dict:
@@ -590,16 +252,20 @@ def generate_article(
         logger.warning("Groq client unavailable, using fallback")
         return generate_fallback_article(trend)
     
-    # Build prompt
-    prompt = build_synthesis_prompt(
-        source_articles, 
-        topic, 
-        target_words,
-        include_subheadings
+    # Build prompt — dateline resolved once, shared by prompt and metadata
+    system_msg, user_prompt, dateline, story_type = build_synthesis_prompt(
+        articles=source_articles,
+        topic=topic,
+        target_words=target_words,
+        include_subheadings=include_subheadings,
     )
+    
+    # Dynamic max_tokens based on target word count
+    max_tokens = min(2300, int(target_words * 1.45) + 300)
     
     logger.info(f"🖊️ Generating article for trend: '{topic}'")
     logger.info(f"   Sources: {len(source_articles)} articles")
+    logger.info(f"   Story type: {story_type.name}")
     
     # Attempt generation with retries
     for attempt in range(max_retries):
@@ -610,18 +276,12 @@ def generate_article(
             response = client.chat.completions.create(
                 model=model,
                 messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a professional news journalist for a major international news agency. Write comprehensive, balanced, factual news articles by synthesizing multiple sources. Follow AP style guidelines. CRITICAL: Each article must focus on ONE SINGLE TOPIC ONLY. If you receive sources about multiple different topics, identify the main topic and write EXCLUSIVELY about that topic. NEVER mix unrelated topics (e.g., do not combine Gaza conflict with Australian Open tennis). Focus is paramount."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
+                    {"role": "system", "content": system_msg},
+                    {"role": "user",   "content": user_prompt},
                 ],
-                temperature=0.3,  # Lower for more factual output
-                max_tokens=2500,
-                top_p=0.9
+                temperature=0.28,
+                max_tokens=max_tokens,
+                top_p=0.9,
             )
             
             # Extract generated content
@@ -641,28 +301,19 @@ def generate_article(
                 logger.warning(f"Article too short ({word_count} words), retrying...")
                 continue
             
-            # Validate topic focus - check for unrelated content
-            validation = validate_topic_focus(article, topic, source_articles)
-            
-            if not validation['is_focused']:
-                logger.warning(f"⚠️ Article may contain unrelated content about: {', '.join(validation['detected_categories'])}")
-                logger.warning(f"Main topic should be: '{topic}'")
-                # Log warnings but still proceed - manual review recommended
-            
             # Add metadata
-            article['dateline'] = infer_dateline(source_articles)
-            article['timestamp'] = format_timestamp()
-            article['sources_used'] = list(set([
-                a.get('source_name', 'Unknown') 
-                for a in source_articles
-            ]))
-            article['word_count'] = word_count
-            article['source_count'] = len(source_articles)
-            article['topic'] = topic
-            article['keywords'] = trend.get('keywords', [])[:10]
-            article['generated_at'] = datetime.utcnow().isoformat()
-            article['model_used'] = model
-            article['validation'] = validation  # Add validation results to metadata
+            article.update({
+                "dateline":     dateline,
+                "topic":        topic,
+                "timestamp":    format_timestamp(),
+                "sources_used": list({a.get("source_name", "Unknown") for a in source_articles}),
+                "source_count": len(source_articles),
+                "word_count":   len(article["story"].split()),
+                "keywords":     trend.get("keywords", [])[:10],
+                "generated_at": datetime.utcnow().isoformat(),
+                "model_used":   model,
+                "story_type":   story_type.name,
+            })
             
             logger.info(f"✅ Generated article: '{article['heading'][:50]}...'")
             logger.info(f"   Word count: {article['word_count']}")
