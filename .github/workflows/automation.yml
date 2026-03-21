@@ -19,12 +19,23 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install CPU-only PyTorch
+        run: pip install torch==2.1.2+cpu --extra-index-url https://download.pytorch.org/whl/cpu
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install langdetect==1.0.9
           pip install -r requirements-render.txt
 
+      - name: Cache sentence-transformer model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/torch/sentence_transformers
+          key: st-model-all-MiniLM-L6-v2
+
+      - name: Pre-download sentence-transformer model
+        run: python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
 
       - name: Run automation pipeline
         env:
@@ -64,7 +75,7 @@ jobs:
           SCRAPING_INTERVAL_HOURS: "3"
           IMAGE_WIDTH: "1024"
           IMAGE_HEIGHT: "768"
-          DUPLICATE_SIMILARITY_THRESHOLD: "0.85"
+          DUPLICATE_SIMILARITY_THRESHOLD: "0.75"
           LOG_LEVEL: INFO
 
         run: python run_automation.py --mode once

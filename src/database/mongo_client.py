@@ -90,16 +90,20 @@ class MongoDBClient:
             logger.info(f"Connecting to MongoDB at {self.uri[:30]}...")
             
             # Create client with connection pooling
-            import certifi
-            self.client = MongoClient(
-                self.uri,
+            # Enable TLS only for remote (Atlas) connections, not localhost
+            is_local = "localhost" in self.uri or "127.0.0.1" in self.uri
+            connect_kwargs = dict(
                 serverSelectionTimeoutMS=20000,  # 20 second timeout
                 connectTimeoutMS=20000,
                 maxPoolSize=50,
                 retryWrites=True,
-                tls=True,
-                tlsCAFile=certifi.where(),
             )
+            if not is_local:
+                import certifi
+                connect_kwargs["tls"] = True
+                connect_kwargs["tlsCAFile"] = certifi.where()
+
+            self.client = MongoClient(self.uri, **connect_kwargs)
             
             # Test connection
             self.client.admin.command('ping')
@@ -220,9 +224,12 @@ class MongoDBClient:
 
             # MongoDB uses the `language` field as a text-index language specifier.
             # Values like 'hi' (Hindi) and 'ar' (Arabic) are not supported and cause
-            # error 17262. Rename it to `content_language` before saving.
+            # error 17262. Copy to `content_language` and remove from the DB document.
+            # Note: `article` is already a shallow copy ({**article_dict, ...}) so
+            # this does not mutate the caller's original dictionary.
             if "language" in article:
-                article["content_language"] = article.pop("language")
+                article["content_language"] = article["language"]
+                del article["language"]
 
             # Only include hocalwire_feed_id if it has a real value (schema requires string, not null)
             if article_dict.get("hocalwire_feed_id"):
@@ -522,7 +529,7 @@ class MongoDBClient:
         b = np.array(b)
         return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
     
-    def check_duplicate(self, article_text: str, similarity_threshold: float = 0.85) -> bool:
+    def check_duplicate(self, article_text: str, similarity_threshold: float = 0.85, exclude_session_id: str = None) -> bool:
         """
         Check if an article is a duplicate of existing articles.
         
@@ -532,6 +539,8 @@ class MongoDBClient:
         Args:
             article_text: Text content of the article.
             similarity_threshold: Minimum similarity to consider duplicate (0.0-1.0).
+            exclude_session_id: If provided, exclude articles from this session
+                                to prevent same-run false positives.
             
         Returns:
             bool: True if duplicate found, False otherwise.
@@ -549,14 +558,21 @@ class MongoDBClient:
             # Get recent articles (last 48 hours)
             cutoff_time = datetime.utcnow() - timedelta(hours=48)
             
+            # Base query: generated articles from the last 48 hours
+            base_query = {
+                "scraped_at": {"$gte": cutoff_time},
+                "pipeline_stage": "generated",
+            }
+            # Exclude articles from the current pipeline session to avoid
+            # two related-but-different articles flagging each other.
+            if exclude_session_id:
+                base_query["session_id"] = {"$ne": exclude_session_id}
+            
             # If embeddings are available, use them
             if new_embedding is not None:
+                emb_query = {**base_query, "embedding": {"$exists": True}}
                 recent_articles = self.articles.find(
-                    {
-                        "scraped_at": {"$gte": cutoff_time},
-                        "pipeline_stage": "generated",
-                        "embedding": {"$exists": True}
-                    },
+                    emb_query,
                     {"embedding": 1, "heading": 1}
                 )
                 
@@ -578,7 +594,10 @@ class MongoDBClient:
                 _STOP = {'the','a','an','and','or','but','in','on','at','to','for',
                          'of','with','by','from','as','is','was','are','were','be',
                          'has','have','had','its','it','this','that','not','no',
-                         'says','said','say','after','over','into','news','update'}
+                         'says','said','say','after','over','into','news','update',
+                         'government','president','minister','officials','people',
+                         'country','world','report','reports','reported','new',
+                         'state','states','national','international','according'}
                 
                 def _heading_jaccard(h1: str, h2: str) -> float:
                     """Word-set overlap (Jaccard) — robust to word reordering by LLM."""
@@ -590,12 +609,9 @@ class MongoDBClient:
                 
                 # IMPORTANT: Only compare against previously GENERATED articles,
                 # NOT raw scraped articles (which are saved in the same pipeline run).
+                fallback_query = {**base_query, "heading": {"$exists": True}}
                 recent_articles = self.articles.find(
-                    {
-                        "scraped_at": {"$gte": cutoff_time},
-                        "pipeline_stage": "generated",
-                        "heading": {"$exists": True}
-                    },
+                    fallback_query,
                     {"story": 1, "heading": 1}
                 )
                 
