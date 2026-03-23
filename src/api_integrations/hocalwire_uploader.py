@@ -41,6 +41,14 @@ except ImportError:
 # Cache for the authenticated session token
 _hocalwire_session_token: Optional[str] = None
 
+# Upload lifecycle statuses
+# "uploading"  = POST has been sent, outcome unknown (timeout risk window)
+# "uploaded"   = 200 response confirmed, feed ID received
+# "failed"     = confirmed failure (non-timeout exception or API rejection)
+_STATUS_UPLOADING = "uploading"
+_STATUS_UPLOADED  = "uploaded"
+_STATUS_FAILED    = "failed"
+
 
 # ===========================================
 # CONFIGURATION
@@ -260,89 +268,104 @@ def generate_session_id(prefix: str = "SCRAPE") -> str:
 
 def format_article_for_cms(story: str) -> str:
     """
-    Convert markdown-formatted article to clean HTML for CMS display.
-    
-    IMPORTANT: Hocalwire displays h2 tags with different fonts/styling.
-    To ensure ALL text appears in the same font, we convert everything
-    to paragraphs (<p> tags) with bold text for subheadings.
-    
-    Converts:
-    - ## Subheadings to <p><strong> (bold paragraph, NOT h2)
-    - Paragraphs separated by double newlines to <p> tags
-    - Removes all markdown artifacts (**, __, ##)
-    - Ensures consistent font styling throughout
-    
+    Convert markdown-formatted article to semantic HTML for CMS display.
+
+    Produces proper visual hierarchy:
+    - ## headings  → <h2> with inline CSS for size distinction
+    - ### headings → <h3> italic (defensive — parser usually strips these)
+    - Bullet runs  → <ul><li> blocks with spacing
+    - **bold**     → <strong> tags
+    - Body text    → <p> with comfortable line-height and margins
+
     Args:
         story: Article content in markdown format.
-        
+
     Returns:
-        HTML-formatted article content with consistent styling.
+        HTML-formatted article content with semantic structure.
     """
     if not story:
         return ""
-    
-    # Split into lines for processing
+
+    import re
+
+    # ── Accumulators ──
+    paragraph_lines: list = []
+    list_items: list = []
+    html_parts: list = []
+
+    def flush_paragraph():
+        """Flush accumulated body-text lines into a single <p> tag."""
+        if paragraph_lines:
+            text = ' '.join(paragraph_lines)
+            html_parts.append(
+                f'<p style="margin-bottom:0.9em; line-height:1.7;">{text}</p>'
+            )
+            paragraph_lines.clear()
+
+    def flush_list():
+        """Flush accumulated bullet items into a <ul> block."""
+        if list_items:
+            items_html = ''.join(
+                f'<li style="margin-bottom:0.35em;">{item}</li>'
+                for item in list_items
+            )
+            html_parts.append(
+                f'<ul style="padding-left:1.4em; margin:0.7em 0; '
+                f'line-height:1.7;">{items_html}</ul>'
+            )
+            list_items.clear()
+
+    # ── Process each line ──
     lines = story.split('\n')
-    html_parts = []
-    current_paragraph = []
-    
+
     for line in lines:
-        line = line.strip()
-        
-        # Skip empty lines
-        if not line:
-            # If we have accumulated paragraph text, wrap it
-            if current_paragraph:
-                para_text = ' '.join(current_paragraph)
-                # Add explicit normal font weight to override platform styling
-                html_parts.append(f'<p style="font-weight: normal;">{para_text}</p>')
-                current_paragraph = []
-            continue
-        
-        # Handle subheadings (## format)
-        # Convert to BOLD PARAGRAPH instead of h2 for consistent fonts
-        if line.startswith('## '):
-            # Close any open paragraph
-            if current_paragraph:
-                para_text = ' '.join(current_paragraph)
-                # Remove ANY bold markers from paragraph text
-                para_text = para_text.replace('**', '').replace('__', '')
-                # Add explicit normal font weight
-                html_parts.append(f'<p style="font-weight: normal;">{para_text}</p>')
-                current_paragraph = []
-            
-            # Add subheading as bold paragraph (not h2!)
-            heading_text = line.replace('## ', '').strip()
-            # Also remove bold markers from subheadings (they're already in <strong>)
-            heading_text = heading_text.replace('**', '').replace('__', '')
-            # Use explicit bold styling for headings
-            html_parts.append(f'<p style="font-weight: bold;"><strong>{heading_text}</strong></p>')
-        
-        # Regular paragraph text
+        # Step 1: Convert **bold** → <strong> BEFORE any other processing
+        line = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', line)
+        stripped = line.strip()
+
+        if not stripped:
+            # Empty line: flush both accumulators
+            flush_list()
+            flush_paragraph()
+
+        elif stripped.startswith('## ') and not stripped.startswith('### '):
+            # ## section header → <h2> with size distinction from body text
+            flush_list()
+            flush_paragraph()
+            heading_text = stripped[3:].strip()
+            html_parts.append(
+                f'<h2 style="font-size:1.25em; font-weight:600; '
+                f'margin-top:1.5em; margin-bottom:0.5em; '
+                f'color:inherit;">{heading_text}</h2>'
+            )
+
+        elif stripped.startswith('### '):
+            # ### subheadline → <h3> italic (defensive; parser normally strips this)
+            flush_list()
+            flush_paragraph()
+            sub_text = stripped[4:].strip()
+            html_parts.append(
+                f'<h3 style="font-size:1.1em; font-weight:500; '
+                f'font-style:italic; margin-top:0.3em; '
+                f'margin-bottom:1em; color:inherit;">{sub_text}</h3>'
+            )
+
+        elif stripped.startswith('- ') or stripped.startswith('* '):
+            # Bullet line: flush any open paragraph, add to list buffer
+            flush_paragraph()
+            bullet_text = stripped[2:].strip()
+            list_items.append(bullet_text)
+
         else:
-            # CRITICAL: Remove all bold/formatting markers from body text
-            line = line.replace('**', '')  # Remove bold markers
-            line = line.replace('__', '')  # Remove underscore markers  
-            line = line.replace('##', '')  # Remove any stray ##
-            line = line.replace('<strong>', '').replace('</strong>', '')  # Remove any HTML bold tags
-            line = line.replace('<b>', '').replace('</b>', '')  # Remove <b> tags too
-            
-            # Only add non-empty lines
-            if line.strip():
-                current_paragraph.append(line)
-    
-    # Close final paragraph if any
-    if current_paragraph:
-        para_text = ' '.join(current_paragraph)
-        # Remove ANY remaining bold markers
-        para_text = para_text.replace('**', '').replace('__', '')
-        # Add explicit normal font weight
-        html_parts.append(f'<p style="font-weight: normal;">{para_text}</p>')
-    
-    # Join all HTML parts with double newlines for proper spacing
-    html_content = '\n\n'.join(html_parts)
-    
-    return html_content
+            # Body text: flush any open list, add to paragraph buffer
+            flush_list()
+            paragraph_lines.append(stripped)
+
+    # ── Final flush ──
+    flush_list()
+    flush_paragraph()
+
+    return '\n\n'.join(html_parts)
 
 
 # ===========================================
@@ -459,7 +482,30 @@ def upload_to_hocalwire(
         logger.info(f"[DRY RUN] Would upload: {heading[:50]}...")
         logger.debug(f"[DRY RUN] Payload: {payload}")
         return True
-    
+
+    # ── Pre-flight: mark as uploading before the request fires ──────────────
+    # This ensures that if the request times out, a subsequent retry
+    # can detect the unknown-outcome state and skip re-posting to prevent
+    # duplicate articles. Written outside the try block so it persists
+    # even when an exception is raised.
+    if article.get('_id'):
+        try:
+            from src.database.mongo_client import get_client as _get_client
+            _db_pre = _get_client()
+            if _db_pre._ensure_connected():
+                _db_pre.articles.update_one(
+                    {"_id": article['_id']},
+                    {"$set": {
+                        "upload_status": _STATUS_UPLOADING,
+                        "upload_attempted_at": datetime.utcnow(),
+                    }}
+                )
+                logger.debug(f"Marked article as '{_STATUS_UPLOADING}' before POST")
+        except Exception as _pre_err:
+            # Non-fatal — if this write fails, proceed with upload anyway
+            # The retry guard will simply not fire for this article
+            logger.warning(f"Pre-flight status write failed (non-fatal): {_pre_err}")
+
     try:
         # Set up headers (Hocalwire uses 's-id' header, not Authorization)
         headers = {
@@ -474,7 +520,7 @@ def upload_to_hocalwire(
             api_url,
             json=payload,
             headers=headers,
-            timeout=30
+            timeout=90
         )
         
         # Check for errors
@@ -678,8 +724,38 @@ def upload_batch_to_hocalwire(
         
         # Attempt upload with retries
         for attempt in range(max_retries):
+
+            # ── Pre-retry guard ─────────────────────────────────────────────────
+            # On any retry (attempt > 0), check whether the previous attempt
+            # left the article in 'uploading' state — meaning the POST was sent
+            # but timed out before we received confirmation.
+            # In that case, skip the retry to prevent a duplicate upload.
+            # The article remains in 'uploading' state for manual review.
+            if attempt > 0 and not dry_run and article.get('_id'):
+                try:
+                    from src.database.mongo_client import get_client as _get_client
+                    _db_check = _get_client()
+                    if _db_check._ensure_connected():
+                        current = _db_check.articles.find_one(
+                            {"_id": article['_id']},
+                            {"upload_status": 1}
+                        )
+                        if current and current.get('upload_status') == _STATUS_UPLOADING:
+                            logger.warning(
+                                f"⚠️  Article '{article.get('heading', '')[:50]}' is in "
+                                f"'{_STATUS_UPLOADING}' state — previous attempt timed out "
+                                f"but may have succeeded on server. Skipping retry to "
+                                f"prevent duplicate. Review manually in Hocalwire dashboard."
+                            )
+                            stats['failed'] += 1
+                            break
+                except Exception as _guard_err:
+                    # Non-fatal — if the guard check fails, proceed with retry
+                    # Better to risk a duplicate than silently drop an article
+                    logger.warning(f"Pre-retry guard check failed (will attempt retry): {_guard_err}")
+
             success = upload_to_hocalwire(article, image_url, session_id, dry_run)
-            
+
             if success:
                 stats['successful'] += 1
                 if 'hocalwire_feed_id' in article:
