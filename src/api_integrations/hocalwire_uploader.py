@@ -591,18 +591,11 @@ def upload_to_hocalwire(
     except requests.exceptions.Timeout:
         error_msg = "Hocalwire API request timed out"
         logger.error(error_msg)
-        article['upload_status'] = 'failed'
-        
-        # Update in database
-        if '_id' in article:
-            from src.database.mongo_client import get_client
-            db = get_client()
-            db.update_upload_status(
-                article['_id'],
-                'failed',
-                failure_reason="Request timeout",
-                increment_retry=True
-            )
+        # Keep status as 'uploading' — do NOT overwrite to 'failed'.
+        # The pre-flight write already set 'uploading' in MongoDB.
+        # Leaving it intact allows the pre-retry guard to detect this
+        # ambiguous state and skip re-posting to prevent duplicates.
+        article['upload_status'] = _STATUS_UPLOADING
         
         return False
         
